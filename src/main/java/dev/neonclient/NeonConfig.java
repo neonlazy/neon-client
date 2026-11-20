@@ -1,0 +1,96 @@
+package dev.neonclient;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import dev.neonclient.module.Module;
+import dev.neonclient.module.ModuleManager;
+import dev.neonclient.module.NumberSetting;
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+
+public class NeonConfig {
+    public enum Style {
+        SOLID("Solid"), CONSTELLATION("Constellation"), GRADIENT("Gradient");
+        public final String label;
+        Style(String label) { this.label = label; }
+    }
+
+    static class ModData {
+        int key;
+        boolean favorite;
+        int color = -1;
+        java.util.List<String> blocks;
+        Map<String, Double> settings = new HashMap<>();
+    }
+
+    static class Data {
+        String style = Style.SOLID.name();
+        int color1 = 0xA020F0;
+        int color2 = 0x2B0A4F;
+        Map<String, ModData> modules = new HashMap<>();
+    }
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("neonclient.json");
+    private static Data data = new Data();
+
+    public static void load() {
+        if (!Files.exists(FILE)) return;
+        try (Reader r = Files.newBufferedReader(FILE)) {
+            Data d = GSON.fromJson(r, Data.class);
+            if (d != null) data = d;
+        } catch (Exception e) {
+            System.err.println("[NeonClient] Impossibile leggere la config: " + e);
+        }
+    }
+
+    public static void save() {
+        for (Module m : ModuleManager.all()) {
+            ModData md = data.modules.computeIfAbsent(m.id(), k -> new ModData());
+            md.key = m.key;
+            md.favorite = m.favorite;
+            md.color = m.hasColor ? m.color : -1;
+            md.blocks = m.getList();
+            for (NumberSetting s : m.settings) md.settings.put(s.name, s.value);
+        }
+        try (Writer w = Files.newBufferedWriter(FILE)) {
+            GSON.toJson(data, w);
+        } catch (IOException e) {
+            System.err.println("[NeonClient] Impossibile salvare la config: " + e);
+        }
+    }
+
+    public static void applyTo(Module m) {
+        ModData md = data.modules.get(m.id());
+        if (md == null) return;
+        m.key = md.key;
+        m.favorite = md.favorite;
+        if (m.hasColor && md.color >= 0) m.color = md.color & 0xFFFFFF;
+        if (md.blocks != null) m.setList(md.blocks);
+        for (NumberSetting s : m.settings) {
+            Double v = md.settings.get(s.name);
+            if (v != null) s.set(v);
+        }
+    }
+
+    public static Style style() {
+        try {
+            return Style.valueOf(data.style);
+        } catch (Exception e) {
+            return Style.SOLID;
+        }
+    }
+
+    public static void setStyle(Style s) { data.style = s.name(); }
+    public static int color1() { return data.color1 & 0xFFFFFF; }
+    public static int color2() { return data.color2 & 0xFFFFFF; }
+    public static void setColor1(int rgb) { data.color1 = rgb & 0xFFFFFF; }
+    public static void setColor2(int rgb) { data.color2 = rgb & 0xFFFFFF; }
+}

@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "dev.neonclient.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "client": [
+    "CameraMixin",
+    "EntityMixin",
+    "GuiMixin",
+    "MinecraftMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

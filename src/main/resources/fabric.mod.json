@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "neonclient",
+  "version": "${version}",
+  "name": "Neon Client",
+  "description": "Client-side GUI with toggleable modules. Press Right Shift to open.",
+  "authors": ["You"],
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.neonclient.NeonClient"]
+  },
+  "mixins": [
+    { "config": "neonclient.mixins.json", "environment": "client" }
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
