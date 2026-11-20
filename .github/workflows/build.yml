@@ -26,3 +26,8 @@ jobs:
         with:
           name: neon-client-jar
           path: build/libs/*.jar
+
+      - name: Mostra mixin refmap
+        run: |
+          cd build/libs
+          for f in *.jar; do echo "== $f"; unzip -l "$f"; unzip -p "$f" '*refmap*.json' || true; done
