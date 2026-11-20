@@ -144,4 +144,17 @@ public class NeonConfig {
     }
 
     public static void setFont(FontChoice f) { data.font = f.name(); }
+
+    /** Riporta stile, colori, pannelli e carattere della GUI ai valori originali. */
+    public static void resetAppearance() {
+        Data d = new Data();
+        data.style = d.style;
+        data.color1 = d.color1;
+        data.color2 = d.color2;
+        data.panelStyle = d.panelStyle;
+        data.panelColor1 = d.panelColor1;
+        data.panelColor2 = d.panelColor2;
+        data.font = d.font;
+        save();
+    }
 }

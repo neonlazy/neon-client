@@ -48,6 +48,8 @@ public class NeonScreen extends Screen {
     /** Elemento di cui si sta cambiando il colore ("" = colore di default del modulo). */
     private String colorTarget;
     private double listScroll;
+    /** Momento del primo click su "Reset" (serve un secondo click di conferma entro 4 secondi). */
+    private long resetArmedAt;
     private int listX, listY, listW, listH;
     private final java.util.Map<String, String> names = new java.util.HashMap<>();
     private final java.util.Map<String, ItemStack> icons = new java.util.HashMap<>();
@@ -161,7 +163,10 @@ public class NeonScreen extends Screen {
         drawTabs(g, w);
 
         if (tab == TAB_MODULES) drawModules(g, w, h);
-        else if (tab == TAB_CUSTOMIZE) drawCustomize(g, w);
+        else if (tab == TAB_CUSTOMIZE) {
+            drawCustomize(g, w);
+            drawResetButton(g, h);
+        }
         else ui.centered(g, "Empty for now", w / 2, 50, Ui.TEXT_FAINT);
         drawWatermark(g, w, h);
         super.render(g, ui.mx, ui.my, partialTick);
@@ -496,6 +501,27 @@ public class NeonScreen extends Screen {
             return e.icon().get();
         } catch (Exception ex) {
             return ItemStack.EMPTY;
+        }
+    }
+
+    /** In basso a sinistra: ripristina l'aspetto originale, con click di conferma. */
+    private void drawResetButton(GuiGraphics g, int h) {
+        boolean armed = resetArmedAt != 0 && System.currentTimeMillis() - resetArmedAt < 4000;
+        if (!armed) resetArmedAt = 0;
+        String label = armed ? "Click again to confirm" : "Reset to defaults";
+        int bw = ui.width(label) + 16, x = 5, y = h - 32;
+        boolean hov = ui.hover(x, y, bw, 14);
+        int bg = armed ? 0xFFB3262E : (hov ? Ui.WIDGET_HOVER : Ui.WIDGET_BG);
+        g.fill(x, y, x + bw, y + 14, bg);
+        g.fill(x, y + 13, x + bw, y + 14, armed ? 0xFFFF5A5F : Ui.argb(Ui.accent(), 0xA0));
+        ui.centered(g, label, x + bw / 2, y + 3, Ui.WHITE);
+        if (hov && ui.lp) {
+            if (armed) {
+                NeonConfig.resetAppearance();
+                resetArmedAt = 0;
+            } else {
+                resetArmedAt = System.currentTimeMillis();
+            }
         }
     }
 

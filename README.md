@@ -16,7 +16,7 @@ Versione: 0.0.5 — premi **Right Shift** in gioco per aprire la GUI.
 - Schede in alto: Modules, Config, Customize
 - Colonna **Search** (dopo Favorites) per cercare i moduli per nome
 - Impostazioni degli ESP con selettore: colore di default + lista degli elementi scelti, tasto destro su un elemento per cambiarne il colore
-- **Customize**: carattere (Minecraft / Default / Vanilla+), stile e colori dello sfondo, stile (Solid / Gradient / Glass) e colori dei pannelli dei moduli
+- **Customize**: carattere (Minecraft / Default / Vanilla+), stile e colori dello sfondo, stile (Solid / Gradient / Glass) e colori dei pannelli dei moduli; "Reset to defaults" in basso a sinistra (con click di conferma)
 
 ## Caratteri inclusi
 - Default: Inter (SIL Open Font License 1.1)
@@ -27,7 +27,7 @@ Licenze in `src/main/resources/assets/neonclient/font/`.
 Ogni push su GitHub avvia il build; il jar e' in Actions -> ultima esecuzione -> Artifacts.
 
 ## Versioni
-- 0.0.5 — colori per singolo blocco/mob/oggetto negli ESP, scelta del carattere, schede Macros e Profiles rimosse, Modules prima scheda, Search dopo Favorites
+- 0.0.5 — colori per singolo blocco/mob/oggetto negli ESP, scelta del carattere, schede Macros e Profiles rimosse, Modules prima scheda, Search dopo Favorites, reset dell'aspetto in Customize
 - 0.0.4 — glowing per Block ESP, Entity ESP, Item ESP, colonna Search, personalizzazione pannelli, rottura blocchi in freecam, GUI ridotta di un altro 25%, tutto in ordine alfabetico
 - 0.0.3 — freecam con movimento orizzontale (stile spectator), glowing per Player ESP, linee tracker, GUI ridotta del 25% e spostata a sinistra
 - 0.0.2 — Player ESP, Block ESP con selettore blocchi, fix freecam, nuova GUI
