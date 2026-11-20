@@ -2,7 +2,7 @@ package dev.neonclient.module;
 
 public class NumberSetting {
     public final String name;
-    public final double min, max, step;
+    public final double min, max, step, def;
     public double value;
 
     public NumberSetting(String name, double min, double max, double def, double step) {
@@ -10,6 +10,7 @@ public class NumberSetting {
         this.min = min;
         this.max = max;
         this.step = step;
+        this.def = def;
         this.value = def;
     }
 

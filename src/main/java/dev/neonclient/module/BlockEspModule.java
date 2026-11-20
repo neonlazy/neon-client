@@ -33,6 +33,10 @@ public class BlockEspModule extends SelectionModule {
 
     public final NumberSetting range = new NumberSetting("Range (chunks)", 1, 16, 8, 1);
     public final BoolSetting tracers = new BoolSetting("Tracers", false);
+    /** Evidenzia anche tutti i blocchi contenitore (chest, barrel, hopper, shulker...). */
+    public final BoolSetting storage = new BoolSetting("Storage ESP", false);
+    private boolean lastStorage;
+    private static Set<Block> storageBlocks;
 
     private static final class ChunkData {
         List<BlockPos> list = new ArrayList<>();
@@ -51,6 +55,7 @@ public class BlockEspModule extends SelectionModule {
         hasColor = true;
         color = 0xFFFFFF;
         settings.add(range);
+        bools.add(storage);
         bools.add(tracers);
     }
 
@@ -92,8 +97,10 @@ public class BlockEspModule extends SelectionModule {
         }
         tickCount++;
 
-        if (dirty || cachedDefault != color) {
+        if (dirty || cachedDefault != color || lastStorage != storage.value) {
+            lastStorage = storage.value;
             Set<Block> t = new HashSet<>();
+            if (storage.value) t.addAll(storageBlocks());
             Map<Block, Integer> cols = new HashMap<>();
             for (String id : selected) {
                 Block b = Catalog.block(id);
@@ -155,6 +162,25 @@ public class BlockEspModule extends SelectionModule {
 
         if (tickCount % 10 == 0) rebuildSnapshot(level, cx, cy, cz);
         BlockGlow.sync(level, snapshot, this);
+    }
+
+    /** Blocchi contenitore: tutte le chest (anche copper, ender, trapped), shulker box, barrel, hopper... */
+    public static Set<Block> storageBlocks() {
+        if (storageBlocks == null) {
+            Set<String> extra = Set.of("minecraft:barrel", "minecraft:hopper", "minecraft:dropper",
+                    "minecraft:dispenser", "minecraft:crafter", "minecraft:decorated_pot", "minecraft:furnace",
+                    "minecraft:blast_furnace", "minecraft:smoker", "minecraft:brewing_stand");
+            Set<Block> s = new HashSet<>();
+            for (Catalog.Entry e : Catalog.blocks()) {
+                String id = e.id();
+                if (id.endsWith("chest") || id.endsWith("shulker_box") || extra.contains(id)) {
+                    Block b = Catalog.block(id);
+                    if (b != null) s.add(b);
+                }
+            }
+            storageBlocks = s;
+        }
+        return storageBlocks;
     }
 
     /** Colore con cui evidenziare un blocco (personalizzato o di default). */

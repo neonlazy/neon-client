@@ -32,7 +32,7 @@ public class NeonConfig {
 
     /** Carattere della GUI. */
     public enum FontChoice {
-        MINECRAFT("Minecraft"), DEFAULT("Default"), VANILLA_PLUS("Vanilla+");
+        MINECRAFT("Minecraft"), DEFAULT("Default"), VANILLA_PLUS("Alternative");
         public final String label;
         FontChoice(String label) { this.label = label; }
     }
@@ -52,6 +52,10 @@ public class NeonConfig {
         int color2 = 0x2B0A4F;
         String panelStyle = PanelStyle.SOLID.name();
         String font = FontChoice.MINECRAFT.name();
+        int uiScale = 100;
+        boolean freeMove = false;
+        Map<String, int[]> panels = new HashMap<>();
+        java.util.List<String> collapsed = new java.util.ArrayList<>();
         int panelColor1 = 0x0B0912;
         int panelColor2 = 0x2A0F45;
         Map<String, ModData> modules = new HashMap<>();
@@ -155,6 +159,46 @@ public class NeonConfig {
         data.panelColor1 = d.panelColor1;
         data.panelColor2 = d.panelColor2;
         data.font = d.font;
+        data.uiScale = d.uiScale;
+        data.freeMove = d.freeMove;
+        data.panels = d.panels;
+        data.collapsed = d.collapsed;
         save();
+    }
+
+    /** Riporta tutti i moduli alle impostazioni originali (spenti, tasti, preferiti, selezioni, colori). */
+    public static void resetModules() {
+        for (Module m : ModuleManager.all()) m.resetToDefaults();
+        data.modules.clear();
+        save();
+    }
+
+    // ------------------------------------------------------------------ layout della GUI
+
+    /** Dimensione della GUI in percentuale (100 = dimensione attuale). */
+    public static int uiScale() {
+        return Math.max(25, Math.min(300, data.uiScale <= 0 ? 100 : data.uiScale));
+    }
+
+    public static void setUiScale(int pct) { data.uiScale = Math.max(25, Math.min(300, pct)); }
+    public static boolean freeMove() { return data.freeMove; }
+    public static void setFreeMove(boolean v) { data.freeMove = v; }
+
+    public static int[] panelPos(String key) {
+        return data.panels == null ? null : data.panels.get(key);
+    }
+
+    public static void setPanelPos(String key, int x, int y) {
+        if (data.panels == null) data.panels = new HashMap<>();
+        data.panels.put(key, new int[]{x, y});
+    }
+
+    public static boolean collapsed(String key) {
+        return data.collapsed != null && data.collapsed.contains(key);
+    }
+
+    public static void toggleCollapsed(String key) {
+        if (data.collapsed == null) data.collapsed = new java.util.ArrayList<>();
+        if (!data.collapsed.remove(key)) data.collapsed.add(key);
     }
 }

@@ -44,8 +44,9 @@ public class PickerScreen extends Screen {
     @Override
     protected void init() {
         if (ui == null) ui = new Ui(this.font);
-        vw = (int) Math.ceil(this.width / NeonScreen.SCALE);
-        vh = (int) Math.ceil(this.height / NeonScreen.SCALE);
+        float sc = NeonScreen.scale();
+        vw = (int) Math.ceil(this.width / sc);
+        vh = (int) Math.ceil(this.height / sc);
         pw = Math.min(300, vw - 20);
         ph = vh - 30;
         px = NeonScreen.anchorX(vw, pw);
@@ -121,12 +122,13 @@ public class PickerScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         if (ui == null) ui = new Ui(this.font);
-        int smx = (int) (mouseX / NeonScreen.SCALE), smy = (int) (mouseY / NeonScreen.SCALE);
+        float sc = NeonScreen.scale();
+        int smx = (int) (mouseX / sc), smy = (int) (mouseY / sc);
         ui.beginFrame(smx, smy);
         handleKeys();
 
         g.pose().pushMatrix();
-        g.pose().scale(NeonScreen.SCALE, NeonScreen.SCALE);
+        g.pose().scale(sc, sc);
         g.fill(0, 0, vw, vh, 0xA0050308);
         ui.panel(g, px, py, pw, ph, module.name + "  -  select " + module.noun(), module.selected.size() + " selected");
 

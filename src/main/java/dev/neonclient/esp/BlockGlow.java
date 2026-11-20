@@ -43,7 +43,7 @@ public final class BlockGlow {
 
     /** True se il blocco ha un modello e quindi puo' brillare. */
     public static boolean canGlow(BlockState state) {
-        return state.getRenderShape() != RenderShape.INVISIBLE;
+        return state.getRenderShape() != RenderShape.INVISIBLE || state.hasBlockEntity();
     }
 
     public static void sync(ClientLevel level, BlockPos[] positions, BlockEspModule module) {

@@ -19,6 +19,18 @@ public abstract class SelectionModule extends Module {
         super(name, category);
     }
 
+    /** Elementi scelti all'inizio (e dopo un reset). */
+    protected List<String> defaultSelection() {
+        return List.of();
+    }
+
+    @Override
+    public void resetToDefaults() {
+        super.resetToDefaults();
+        setList(defaultSelection());
+        colors.clear();
+    }
+
     /** Elenco completo mostrato nel selettore. */
     public abstract List<Catalog.Entry> catalog();
 

@@ -11,6 +11,7 @@ public class ModuleManager {
     public static final FreecamModule FREECAM = new FreecamModule();
     public static final ItemEspModule ITEM_ESP = new ItemEspModule();
     public static final PlayerEspModule PLAYER_ESP = new PlayerEspModule();
+    public static final XrayModule XRAY = new XrayModule();
 
     private static final List<Module> MODULES = new ArrayList<>();
 
@@ -22,6 +23,7 @@ public class ModuleManager {
         MODULES.add(FREECAM);
         MODULES.add(ITEM_ESP);
         MODULES.add(PLAYER_ESP);
+        MODULES.add(XRAY);
         MODULES.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
         for (Module m : MODULES) NeonConfig.applyTo(m);
     }

@@ -5,11 +5,13 @@
   "minVersion": "0.8",
   "client": [
     "BlockDisplayAccessor",
+    "BlockMixin",
     "CameraMixin",
     "DisplayAccessor",
     "EntityMixin",
     "GameRendererMixin",
     "GuiMixin",
+    "LightTextureMixin",
     "MinecraftMixin"
   ],
   "injectors": {

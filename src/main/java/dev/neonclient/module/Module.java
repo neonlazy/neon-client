@@ -18,6 +18,7 @@ public abstract class Module {
     /** Se true la finestra impostazioni mostra il selettore colore. */
     public boolean hasColor;
     public int color = 0xFFFFFF;
+    protected int defaultColor = 0xFFFFFF;
 
     protected Module(String name, Category category) {
         this.name = name;
@@ -41,6 +42,16 @@ public abstract class Module {
     protected void onEnable() {}
     protected void onDisable() {}
     public void onTick() {}
+
+    /** Riporta il modulo alle impostazioni originali (spento, senza tasto, non preferito). */
+    public void resetToDefaults() {
+        setEnabled(false);
+        key = 0;
+        favorite = false;
+        color = defaultColor;
+        for (NumberSetting s : settings) s.value = s.def;
+        for (BoolSetting b : bools) b.value = b.def;
+    }
 
     /** Lista extra da salvare in config (usata da Block ESP). */
     public List<String> getList() { return null; }

@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Random;
 
 public class NeonScreen extends Screen {
-    private static final String[] TABS = {"Modules", "Config", "Customize"};
+    private static final String[] TABS = {"Modules", "Customize"};
     private static final int TAB_MODULES = 0;
-    private static final int TAB_CUSTOMIZE = 2;
+    private static final int TAB_CUSTOMIZE = 1;
     /** Colonne in ordine alfabetico, poi Favorites e Search (null). */
     private static final Category[] COLUMNS = {
             Category.COMBAT, Category.MISC, Category.MOVEMENT, Category.PLAYER,
@@ -35,7 +35,7 @@ public class NeonScreen extends Screen {
     private static final int GAP = 5;
     private static final int ROW = 11;
     /** Scala della GUI (0.75 = 25% piu' piccola). */
-    static final float SCALE = 0.5625f;
+    private static final float BASE_SCALE = 0.5625f;
     /** Centro orizzontale dei contenuti, leggermente a sinistra del centro schermo. */
     static final float ANCHOR = 0.34f;
 
@@ -48,8 +48,13 @@ public class NeonScreen extends Screen {
     /** Elemento di cui si sta cambiando il colore ("" = colore di default del modulo). */
     private String colorTarget;
     private double listScroll;
-    /** Momento del primo click su "Reset" (serve un secondo click di conferma entro 4 secondi). */
-    private long resetArmedAt;
+    /** Momento del primo click sui pulsanti di reset (serve un secondo click entro 4 secondi). */
+    private final long[] resetArmedAt = new long[2];
+    /** Valore dello slider "UI size" mentre lo si trascina (applicato al rilascio). */
+    private int uiScalePending = -1;
+    /** Pannello che si sta trascinando in Free Move. */
+    private String dragKey;
+    private int dragDX, dragDY, dragX, dragY;
     private int listX, listY, listW, listH;
     private final java.util.Map<String, String> names = new java.util.HashMap<>();
     private final java.util.Map<String, ItemStack> icons = new java.util.HashMap<>();
@@ -119,7 +124,8 @@ public class NeonScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         if (ui == null) ui = new Ui(this.font);
-        ui.beginFrame((int) (mouseX / SCALE), (int) (mouseY / SCALE));
+        float sc = scale();
+        ui.beginFrame((int) (mouseX / sc), (int) (mouseY / sc));
 
         long win = GLFW.glfwGetCurrentContext();
         boolean[] down = new boolean[prevKeys.length];
@@ -144,9 +150,9 @@ public class NeonScreen extends Screen {
         }
         System.arraycopy(down, 0, prevKeys, 0, down.length);
 
-        int w = (int) Math.ceil(this.width / SCALE), h = (int) Math.ceil(this.height / SCALE);
+        int w = (int) Math.ceil(this.width / sc), h = (int) Math.ceil(this.height / sc);
         g.pose().pushMatrix();
-        g.pose().scale(SCALE, SCALE);
+        g.pose().scale(sc, sc);
         if (settingsModule == null) colorTarget = null;
         boolean popup = settingsModule != null;
         boolean lp = ui.lp, rp = ui.rp;
@@ -165,7 +171,11 @@ public class NeonScreen extends Screen {
         if (tab == TAB_MODULES) drawModules(g, w, h);
         else if (tab == TAB_CUSTOMIZE) {
             drawCustomize(g, w);
-            drawResetButton(g, h);
+            if (resetButton(g, 5, h - 50, 0, "Reset modules")) NeonConfig.resetModules();
+            if (resetButton(g, 5, h - 32, 1, "Reset appearance")) {
+                NeonConfig.resetAppearance();
+                uiScalePending = -1;
+            }
         }
         else ui.centered(g, "Empty for now", w / 2, 50, Ui.TEXT_FAINT);
         drawWatermark(g, w, h);
@@ -186,6 +196,11 @@ public class NeonScreen extends Screen {
             }
         }
         g.pose().popMatrix();
+    }
+
+    /** Scala effettiva: BASE_SCALE e' il 100% scelto in Customize (da 25% a 300%). */
+    static float scale() {
+        return BASE_SCALE * NeonConfig.uiScale() / 100f;
     }
 
     /** X di partenza per un contenuto largo contentW, centrato sull'ancora (un po' a sinistra). */
@@ -275,26 +290,89 @@ public class NeonScreen extends Screen {
 
     // ------------------------------------------------------------------ modules
 
+    private static String key(Category c) {
+        return c == null ? "Search" : c.label;
+    }
+
     private void drawModules(GuiGraphics g, int w, int h) {
-        int perRow = Math.max(1, Math.min(COLUMNS.length, (w - 8 + GAP) / (COL_W + GAP)));
+        // posizioni di default (a righe, centrate sull'ancora)
+        int n = COLUMNS.length;
+        int[] px = new int[n], py = new int[n];
+        int perRow = Math.max(1, Math.min(n, (w - 8 + GAP) / (COL_W + GAP)));
         int y = 26;
-        for (int start = 0; start < COLUMNS.length; start += perRow) {
-            int count = Math.min(perRow, COLUMNS.length - start);
+        for (int start = 0; start < n; start += perRow) {
+            int count = Math.min(perRow, n - start);
             int rowW = count * COL_W + (count - 1) * GAP;
             int x = anchorX(w, rowW);
             int tallest = 0;
             for (int i = 0; i < count; i++) {
-                int ph = drawCategory(g, COLUMNS[start + i], x + i * (COL_W + GAP), y);
-                tallest = Math.max(tallest, ph);
+                Category c = COLUMNS[start + i];
+                px[start + i] = x + i * (COL_W + GAP);
+                py[start + i] = y;
+                tallest = Math.max(tallest, panelHeight(c));
             }
             y += tallest + 8;
         }
-        ui.text(g, "LMB toggle  |  RMB settings", 5, h - 12, Ui.TEXT_FAINT);
+        // posizioni scelte dall'utente (Free Move)
+        for (int i = 0; i < n; i++) {
+            int[] pos = NeonConfig.panelPos(key(COLUMNS[i]));
+            if (pos != null) {
+                px[i] = Math.max(0, Math.min(w - COL_W, pos[0]));
+                py[i] = Math.max(20, Math.min(h - 12, pos[1]));
+            }
+        }
+
+        boolean free = NeonConfig.freeMove();
+        // click sulle intestazioni: trascina (Free Move) oppure apri/chiudi la categoria
+        if (ui.lp && dragKey == null) {
+            for (int i = n - 1; i >= 0; i--) {
+                if (!ui.hover(px[i], py[i], COL_W, 12)) continue;
+                String k = key(COLUMNS[i]);
+                if (free) {
+                    dragKey = k;
+                    dragDX = ui.mx - px[i];
+                    dragDY = ui.my - py[i];
+                } else {
+                    NeonConfig.toggleCollapsed(k);
+                    NeonConfig.save();
+                }
+                ui.consume();
+                break;
+            }
+        }
+        if (dragKey != null) {
+            dragX = Math.max(0, Math.min(w - COL_W, ui.mx - dragDX));
+            dragY = Math.max(20, Math.min(h - 12, ui.my - dragDY));
+            if (!ui.l) {
+                NeonConfig.setPanelPos(dragKey, dragX, dragY);
+                NeonConfig.save();
+                dragKey = null;
+            }
+        }
+
+        for (int i = 0; i < n; i++) {
+            String k = key(COLUMNS[i]);
+            boolean dragging = k.equals(dragKey);
+            drawCategory(g, COLUMNS[i], dragging ? dragX : px[i], dragging ? dragY : py[i]);
+        }
+        ui.text(g, free ? "Free Move: drag the category titles" : "LMB toggle  |  RMB settings  |  click a title to hide it",
+                5, h - 12, Ui.TEXT_FAINT);
+    }
+
+    private int panelHeight(Category c) {
+        if (NeonConfig.collapsed(key(c))) return 12;
+        List<Module> mods = c == null ? ModuleManager.search(searchQuery) : ModuleManager.byCategory(c);
+        int top = c == null ? 16 : 0;
+        return 12 + top + (mods.isEmpty() ? 4 : mods.size() * ROW + 4);
     }
 
     private int drawCategory(GuiGraphics g, Category c, int x, int y) {
         boolean search = c == null;
         List<Module> mods = search ? ModuleManager.search(searchQuery) : ModuleManager.byCategory(c);
+        if (NeonConfig.collapsed(key(c))) {
+            ui.panel(g, x, y, COL_W, 12, search ? "Search" : c.label, "+");
+            return 12;
+        }
         int top = search ? 16 : 0; // spazio per la barra di ricerca
         int bodyH = top + (mods.isEmpty() ? 4 : mods.size() * ROW + 4);
         int ph = 12 + bodyH;
@@ -355,7 +433,7 @@ public class NeonScreen extends Screen {
         if (m instanceof SelectionModule sm) {
             h += 18; // pulsante selettore
             h += 18 + 14 + 6; // keybind + preferiti
-            h += 16; // colore di default
+            if (m.hasColor) h += 16; // colore di default
             int n = sm.selected.size();
             h += 12 + (n == 0 ? 12 : Math.min(LIST_MAX_ROWS, n) * LIST_ROW) + 2;
         } else {
@@ -430,15 +508,18 @@ public class NeonScreen extends Screen {
     /** Colore di default + lista degli elementi scelti; tasto destro su una riga = cambia il suo colore. */
     private void drawSelectedList(GuiGraphics g, SelectionModule sm, int cx, int cy, int cw) {
         // colore di default (per gli elementi senza colore proprio e, se non c'e' selezione, per tutti)
-        boolean hovDef = ui.hover(cx, cy, cw, 12);
-        g.fill(cx, cy, cx + cw, cy + 12, hovDef ? Ui.WIDGET_HOVER : Ui.WIDGET_BG);
-        ui.text(g, "Default color", cx + 4, cy + 2, Ui.WHITE);
-        swatch(g, cx + cw - 18, cy + 2, sm.color);
-        if (hovDef && (ui.rp || ui.lp)) colorTarget = "";
-        cy += 16;
+        if (sm.hasColor) {
+            boolean hovDef = ui.hover(cx, cy, cw, 12);
+            g.fill(cx, cy, cx + cw, cy + 12, hovDef ? Ui.WIDGET_HOVER : Ui.WIDGET_BG);
+            ui.text(g, "Default color", cx + 4, cy + 2, Ui.WHITE);
+            swatch(g, cx + cw - 18, cy + 2, sm.color);
+            if (hovDef && (ui.rp || ui.lp)) colorTarget = "";
+            cy += 16;
+        }
 
         List<String> ids = sm.selectedSorted();
-        ui.text(g, "Selected " + sm.noun() + " (" + ids.size() + ")  -  RMB: color", cx, cy, Ui.TEXT_DIM);
+        ui.text(g, "Selected " + sm.noun() + " (" + ids.size() + ")" + (sm.hasColor ? "  -  RMB: color" : ""),
+                cx, cy, Ui.TEXT_DIM);
         cy += 12;
         if (ids.isEmpty()) {
             ui.text(g, sm.emptyMeansAll() ? "None: all " + sm.noun() + " use the default color" : "None selected",
@@ -472,8 +553,10 @@ public class NeonScreen extends Screen {
             g.pose().popMatrix();
             String name = e == null ? id : names.computeIfAbsent(id, k -> safeName(e));
             ui.text(g, ui.trim(name, cw - 40), cx + 17, ry + 3, Ui.TEXT_DIM);
-            swatch(g, cx + cw - 18, ry + 3, sm.colorOf(id));
-            if (hov && ui.rp) colorTarget = id;
+            if (sm.hasColor) {
+                swatch(g, cx + cw - 18, ry + 3, sm.colorOf(id));
+                if (hov && ui.rp) colorTarget = id;
+            }
         }
         g.disableScissor();
         if (maxScroll > 0) {
@@ -504,25 +587,25 @@ public class NeonScreen extends Screen {
         }
     }
 
-    /** In basso a sinistra: ripristina l'aspetto originale, con click di conferma. */
-    private void drawResetButton(GuiGraphics g, int h) {
-        boolean armed = resetArmedAt != 0 && System.currentTimeMillis() - resetArmedAt < 4000;
-        if (!armed) resetArmedAt = 0;
-        String label = armed ? "Click again to confirm" : "Reset to defaults";
-        int bw = ui.width(label) + 16, x = 5, y = h - 32;
+    /** Pulsante di reset con doppio click di conferma; true quando il reset va eseguito. */
+    private boolean resetButton(GuiGraphics g, int x, int y, int slot, String label) {
+        boolean armed = resetArmedAt[slot] != 0 && System.currentTimeMillis() - resetArmedAt[slot] < 4000;
+        if (!armed) resetArmedAt[slot] = 0;
+        String text = armed ? "Click again to confirm" : label;
+        int bw = Math.max(ui.width("Click again to confirm"), ui.width(label)) + 16;
         boolean hov = ui.hover(x, y, bw, 14);
         int bg = armed ? 0xFFB3262E : (hov ? Ui.WIDGET_HOVER : Ui.WIDGET_BG);
         g.fill(x, y, x + bw, y + 14, bg);
         g.fill(x, y + 13, x + bw, y + 14, armed ? 0xFFFF5A5F : Ui.argb(Ui.accent(), 0xA0));
-        ui.centered(g, label, x + bw / 2, y + 3, Ui.WHITE);
+        ui.centered(g, text, x + bw / 2, y + 3, Ui.WHITE);
         if (hov && ui.lp) {
             if (armed) {
-                NeonConfig.resetAppearance();
-                resetArmedAt = 0;
-            } else {
-                resetArmedAt = System.currentTimeMillis();
+                resetArmedAt[slot] = 0;
+                return true;
             }
+            resetArmedAt[slot] = System.currentTimeMillis();
         }
+        return false;
     }
 
     /** Finestrella per cambiare il colore di un elemento (o quello di default). */
@@ -564,9 +647,37 @@ public class NeonScreen extends Screen {
 
     // ------------------------------------------------------------------ customize
 
+    private void drawLayoutPanel(GuiGraphics g, int x0, int y0, int pw) {
+        int ph = 12 + 6 + 10 + 16 + 18 + 22;
+        ui.panel(g, x0, y0, pw, ph, "Layout", "");
+        int cx = x0 + 6, cw = pw - 12, cy = y0 + 18;
+
+        // la dimensione si applica al rilascio, altrimenti lo slider scapperebbe da sotto il mouse
+        ui.text(g, "UI size", cx, cy + 1, Ui.TEXT_DIM);
+        cy += 10;
+        int cur = uiScalePending >= 0 ? uiScalePending : NeonConfig.uiScale();
+        int v = (int) Math.round(ui.slider(g, "uiscale", cx, cy, cw, "Size %", 25, 300, cur, 5));
+        if (v != cur) uiScalePending = v;
+        if (uiScalePending >= 0 && !ui.l) {
+            NeonConfig.setUiScale(uiScalePending);
+            uiScalePending = -1;
+            NeonConfig.save();
+        }
+        cy += 16;
+
+        boolean free = NeonConfig.freeMove();
+        if (ui.button(g, cx, cy, cw, 14, "Free Move: " + (free ? "ON" : "OFF"), free)) {
+            NeonConfig.setFreeMove(!free);
+            NeonConfig.save();
+        }
+        cy += 18;
+        ui.text(g, free ? "Drag category titles in Modules" : "Click a title in Modules to hide it", cx, cy, Ui.TEXT_FAINT);
+    }
+
     private void drawCustomize(GuiGraphics g, int w) {
         int pw = 170, gap = 8;
-        int x0 = anchorX(w, pw * 2 + gap), y0 = 26;
+        int x0 = anchorX(w, pw * 3 + gap * 2), y0 = 26;
+        drawLayoutPanel(g, x0 + 2 * (pw + gap), y0, pw);
 
         // --- sfondo della GUI
         boolean grad = NeonConfig.style() == Style.GRADIENT;

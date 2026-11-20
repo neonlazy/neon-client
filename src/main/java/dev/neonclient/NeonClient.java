@@ -55,7 +55,8 @@ public class NeonClient implements ClientModInitializer {
 
         // Freecam e Block ESP: senza culling delle caverne vengono disegnate anche le zone
         // sotto terra / dietro i muri (e le entita' al loro interno, come i blocchi glowing).
-        boolean noCull = ModuleManager.FREECAM.isActive() || ModuleManager.BLOCK_ESP.enabled;
+        boolean noCull = ModuleManager.FREECAM.isActive() || ModuleManager.BLOCK_ESP.enabled
+                || ModuleManager.XRAY.enabled;
         if (noCull) {
             mc.smartCull = false;
             cullChanged = true;
