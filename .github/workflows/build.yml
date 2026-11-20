@@ -27,7 +27,7 @@ jobs:
           name: neon-client-jar
           path: build/libs/*.jar
 
-      - name: Mostra mixin refmap
+      - name: Controlla i mixin
         run: |
-          cd build/libs
-          for f in *.jar; do echo "== $f"; unzip -l "$f"; unzip -p "$f" '*refmap*.json' || true; done
+          mkdir -p /tmp/chk && cd /tmp/chk && unzip -q -o $GITHUB_WORKSPACE/build/libs/*.jar
+          for c in dev/neonclient/mixin/*.class; do echo "== $c"; javap -v "$c" | grep -E "Utf8 .*(method_|class_|field_|net/minecraft|setup|render|turn|startAttack|continueAttack|startUseItem|setPosition|setRotation)" ; done
