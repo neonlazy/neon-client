@@ -10,6 +10,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Estrai il progetto
+        run: unzip -o neon-client-src.zip
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
