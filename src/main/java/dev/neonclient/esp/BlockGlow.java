@@ -105,7 +105,6 @@ public final class BlockGlow {
         acc.neon$setGlowColorOverride(glow);
         // leggermente piu' grande del blocco vero, per non sovrapporsi esattamente alle sue facce
         acc.neon$setTransformation(new Transformation(new Vector3f(-0.002f), null, new Vector3f(1.004f), null));
-        d.noCulling = true;
         IDS.add(id);
         level.addEntity(d);
         return d;

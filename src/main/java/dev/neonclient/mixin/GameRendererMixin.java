@@ -5,7 +5,9 @@ import dev.neonclient.module.ModuleManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -36,10 +38,16 @@ public abstract class GameRendererMixin {
                 ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, p));
 
         mc.crosshairPickEntity = null;
-        if (hit.getType() == HitResult.Type.BLOCK && p.canInteractWithBlock(hit.getBlockPos(), 0.0)) {
+        if (hit.getType() == HitResult.Type.BLOCK && inReach(p, hit.getBlockPos())) {
             mc.hitResult = hit;
         } else {
             mc.hitResult = BlockHitResult.miss(hit.getLocation(), hit.getDirection(), hit.getBlockPos());
         }
+    }
+
+    /** Stesso controllo del server: il blocco deve essere entro la portata dagli occhi del giocatore. */
+    private static boolean inReach(LocalPlayer p, BlockPos pos) {
+        double r = p.blockInteractionRange();
+        return new AABB(pos).distanceToSqr(p.getEyePosition()) < r * r;
     }
 }
