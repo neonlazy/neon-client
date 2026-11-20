@@ -16,7 +16,7 @@ public final class Ui {
     public static final int WIDGET_HOVER = 0xFF261E36;
 
     public static final int[] PRESETS = {
-            0xA020F0, 0x7B2CFF, 0xD946EF, 0xFF3CAC, 0x00D4FF, 0x2BFF88, 0xFF3B3B, 0xFFFFFF};
+            0xFF3B3B, 0xFF8C1A, 0xFFD60A, 0x2BFF88, 0x00D4FF, 0x3A6BFF, 0x7B2CFF, 0xA020F0, 0xD946EF, 0xFF3CAC, 0xFFFFFF};
 
     // stato input del frame corrente
     public int mx, my;
@@ -166,13 +166,17 @@ public final class Ui {
         g.fill(x + w - 21, y + 1, x + w - 1, y + 8, argb(rgb, 0xFF));
 
         int py = y + 11;
-        for (int i = 0; i < PRESETS.length; i++) {
-            int sx = x + i * 15;
-            if (sx + 12 > x + w) break;
+        // i quadratini si stringono per starci tutti nella larghezza disponibile
+        int n = PRESETS.length;
+        int sz = Math.min(12, (w - (n - 1) * 2) / n);
+        int step = n > 1 ? (w - sz) / (n - 1) : 0;
+        step = Math.min(step, sz + 3);
+        for (int i = 0; i < n; i++) {
+            int sx = x + i * step;
             boolean sel = (rgb & 0xFFFFFF) == PRESETS[i];
-            g.fill(sx - 1, py - 1, sx + 13, py + 13, sel ? WHITE : 0xFF000000);
-            g.fill(sx, py, sx + 12, py + 12, argb(PRESETS[i], 0xFF));
-            if (lp && in(mx, my, sx, py, 12, 12)) rgb = PRESETS[i];
+            g.fill(sx - 1, py - 1, sx + sz + 1, py + 13, sel ? WHITE : 0xFF000000);
+            g.fill(sx, py, sx + sz, py + 12, argb(PRESETS[i], 0xFF));
+            if (lp && in(mx, my, sx, py, sz, 12)) rgb = PRESETS[i];
         }
 
         int r = (rgb >> 16) & 0xFF, gr = (rgb >> 8) & 0xFF, b = rgb & 0xFF;

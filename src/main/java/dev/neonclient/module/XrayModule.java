@@ -8,10 +8,10 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Xray: vengono disegnati solo i blocchi scelti (di default tutti i minerali), con luce piena.
+ * Xray: vengono disegnati solo i minerali, con luce piena (nessuna impostazione).
  * Il resto del mondo diventa invisibile.
  */
-public class XrayModule extends SelectionModule {
+public class XrayModule extends Module {
     private static final List<String> ORES = List.of(
             "minecraft:coal_ore", "minecraft:deepslate_coal_ore",
             "minecraft:copper_ore", "minecraft:deepslate_copper_ore",
@@ -28,22 +28,6 @@ public class XrayModule extends SelectionModule {
 
     public XrayModule() {
         super("Xray", Category.RENDER);
-        selected.addAll(ORES);
-    }
-
-    @Override
-    protected List<String> defaultSelection() {
-        return ORES;
-    }
-
-    @Override
-    public List<Catalog.Entry> catalog() {
-        return Catalog.blocks();
-    }
-
-    @Override
-    public String noun() {
-        return "blocks";
     }
 
     public boolean isVisible(Block b) {
@@ -52,12 +36,11 @@ public class XrayModule extends SelectionModule {
 
     private void rebuild() {
         Set<Block> s = new HashSet<>();
-        for (String id : selected) {
+        for (String id : ORES) {
             Block b = Catalog.block(id);
             if (b != null) s.add(b);
         }
         visible = Set.copyOf(s);
-        dirty = false;
     }
 
     private static void reloadChunks() {
@@ -76,11 +59,4 @@ public class XrayModule extends SelectionModule {
         reloadChunks();
     }
 
-    @Override
-    public void onTick() {
-        if (dirty) {
-            rebuild();
-            reloadChunks();
-        }
-    }
 }

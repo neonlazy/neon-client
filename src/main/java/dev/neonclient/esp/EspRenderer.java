@@ -49,13 +49,6 @@ public final class EspRenderer {
                 drawEntityTracers(g, mc, partialTick);
             }
         }
-
-        // in freecam la visuale e' in terza persona (niente mirino vanilla): ne disegniamo uno
-        if (ModuleManager.FREECAM.isActive() && mc.screen == null) {
-            int cx = g.guiWidth() / 2, cy = g.guiHeight() / 2;
-            g.fill(cx - 4, cy, cx + 5, cy + 1, 0xE0FFFFFF);
-            g.fill(cx, cy - 4, cx + 1, cy + 5, 0xE0FFFFFF);
-        }
     }
 
     private static boolean prepare(GuiGraphics g, Minecraft mc, float pt) {

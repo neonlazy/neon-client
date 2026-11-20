@@ -18,7 +18,10 @@ public abstract class MinecraftMixin {
         if (EspGlow.shouldGlow(entity)) cir.setReturnValue(true);
     }
 
-    /** Durante la freecam si possono rompere blocchi (entro la portata del corpo) ma non usare oggetti. */
+    /**
+     * Durante la freecam il tasto sinistro rompe il blocco che sta guardando il corpo fermo
+     * (bersaglio vanilla, calcolato dal giocatore); il tasto destro resta bloccato.
+     */
     @Inject(method = "startUseItem", at = @At("HEAD"), cancellable = true)
     private void neon$noUse(CallbackInfo ci) {
         if (ModuleManager.FREECAM.isActive()) ci.cancel();

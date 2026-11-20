@@ -9,7 +9,6 @@
     "CameraMixin",
     "DisplayAccessor",
     "EntityMixin",
-    "GameRendererMixin",
     "GuiMixin",
     "LightTextureMixin",
     "MinecraftMixin"

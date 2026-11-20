@@ -171,7 +171,6 @@ public class NeonScreen extends Screen {
         if (tab == TAB_MODULES) drawModules(g, w, h);
         else if (tab == TAB_CUSTOMIZE) {
             drawCustomize(g, w);
-            if (resetButton(g, 5, h - 50, 0, "Reset modules")) NeonConfig.resetModules();
             if (resetButton(g, 5, h - 32, 1, "Reset appearance")) {
                 NeonConfig.resetAppearance();
                 uiScalePending = -1;
@@ -355,6 +354,7 @@ public class NeonScreen extends Screen {
             boolean dragging = k.equals(dragKey);
             drawCategory(g, COLUMNS[i], dragging ? dragX : px[i], dragging ? dragY : py[i]);
         }
+        if (resetButton(g, 5, h - 32, 0, "Reset modules")) NeonConfig.resetModules();
         ui.text(g, free ? "Free Move: drag the category titles" : "LMB toggle  |  RMB settings  |  click a title to hide it",
                 5, h - 12, Ui.TEXT_FAINT);
     }
