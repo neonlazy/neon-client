@@ -7,6 +7,7 @@ public abstract class Module {
     public final String name;
     public final Category category;
     public final List<NumberSetting> settings = new ArrayList<>();
+    public final List<BoolSetting> bools = new ArrayList<>();
 
     public boolean enabled;
     public boolean favorite;

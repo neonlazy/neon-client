@@ -33,7 +33,7 @@ public class BlockPickerScreen extends Screen {
     private final boolean[] prevKeys = new boolean[GLFW.GLFW_KEY_LAST + 1];
 
     // layout
-    private int px, py, pw, ph, listY, listH;
+    private int vw, vh, px, py, pw, ph, listY, listH;
 
     public BlockPickerScreen(Screen parent, BlockEspModule module) {
         super(Component.literal("Block ESP"));
@@ -44,9 +44,11 @@ public class BlockPickerScreen extends Screen {
     @Override
     protected void init() {
         if (ui == null) ui = new Ui(this.font);
-        pw = Math.min(300, this.width - 20);
-        ph = this.height - 30;
-        px = (this.width - pw) / 2;
+        vw = (int) Math.ceil(this.width / NeonScreen.SCALE);
+        vh = (int) Math.ceil(this.height / NeonScreen.SCALE);
+        pw = Math.min(300, vw - 20);
+        ph = vh - 30;
+        px = NeonScreen.anchorX(vw, pw);
         py = 15;
 
         search = new EditBox(this.font, px + 6, py + 17, pw - 12, 14, Component.literal("Search"));
@@ -107,10 +109,13 @@ public class BlockPickerScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         if (ui == null) ui = new Ui(this.font);
-        ui.beginFrame(mouseX, mouseY);
+        int smx = (int) (mouseX / NeonScreen.SCALE), smy = (int) (mouseY / NeonScreen.SCALE);
+        ui.beginFrame(smx, smy);
         handleKeys();
 
-        g.fill(0, 0, this.width, this.height, 0xA0050308);
+        g.pose().pushMatrix();
+        g.pose().scale(NeonScreen.SCALE, NeonScreen.SCALE);
+        g.fill(0, 0, vw, vh, 0xA0050308);
         ui.panel(g, px, py, pw, ph, "Block ESP  -  select blocks", module.selected.size() + " selected");
 
         // filtri
@@ -175,13 +180,13 @@ public class BlockPickerScreen extends Screen {
         // footer
         String info = list.size() + " / " + BlockCatalog.all().size() + " blocks";
         g.drawString(this.font, info, px + 6, py + ph - 15, Ui.TEXT_FAINT);
-        if (ui.button(g, px + pw - 66, py + ph - 18, 60, 14, "Done", false)) {
-            onClose();
-            return;
-        }
+        boolean done = ui.button(g, px + pw - 66, py + ph - 18, 60, 14, "Done", false);
 
-        if (this.getFocused() == null) this.setFocused(search);
-        super.render(g, mouseX, mouseY, partialTick);
+        // la casella di ricerca resta sempre attiva: basta scrivere
+        if (this.getFocused() != search) this.setFocused(search);
+        super.render(g, smx, smy, partialTick);
+        g.pose().popMatrix();
+        if (done) onClose();
     }
 
     private void handleKeys() {

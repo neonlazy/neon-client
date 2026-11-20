@@ -115,32 +115,49 @@ public final class EspRenderer {
         g.fill(bx2, by1, bx2 + 1, by2 + 1, c);
     }
 
+    private static final int BLOCK_TRACER_CAP = 150;
+
     private static void drawBlocks(GuiGraphics g, BlockEspModule be) {
         int rgb = be.color;
-        for (BlockPos p : be.snapshot()) {
+        BlockPos[] list = be.snapshot();
+        for (BlockPos p : list) {
             if (!projectBox(p.getX(), p.getY(), p.getZ(), p.getX() + 1.0, p.getY() + 1.0, p.getZ() + 1.0)) continue;
             outline(g, rgb, 0x20);
         }
+        if (be.tracers.value) {
+            // la lista e' gia' ordinata dal piu' vicino: le linee vanno solo ai primi blocchi
+            int n = Math.min(BLOCK_TRACER_CAP, list.length);
+            for (int i = 0; i < n; i++) {
+                BlockPos p = list[i];
+                tracer(g, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, rgb);
+            }
+        }
     }
 
+    /** Il contorno dei giocatori e' l'effetto glowing vanilla (vedi mixin); qui solo le linee tracker. */
     private static void drawPlayers(GuiGraphics g, Minecraft mc, PlayerEspModule pe, float pt) {
+        if (!pe.tracers.value) return;
         for (Player p : mc.level.players()) {
             if (p == mc.player) continue;
             double x = Mth.lerp(pt, p.xo, p.getX());
-            double y = Mth.lerp(pt, p.yo, p.getY());
+            double y = Mth.lerp(pt, p.yo, p.getY()) + p.getBbHeight() / 2.0;
             double z = Mth.lerp(pt, p.zo, p.getZ());
-            double hw = p.getBbWidth() / 2.0;
-            double hh = p.getBbHeight();
-            if (!projectBox(x - hw, y, z - hw, x + hw, y + hh, z + hw)) continue;
-            outline(g, pe.color, 0x28);
-
-            double dx = x - ox, dy = y - oy, dz = z - oz;
-            String label = p.getName().getString() + "  " + (int) Math.sqrt(dx * dx + dy * dy + dz * dz) + "m";
-            int tw = mc.font.width(label);
-            int tx = (bx1 + bx2) / 2 - tw / 2;
-            int ty = by1 - 11;
-            g.fill(tx - 3, ty - 2, tx + tw + 3, ty + 9, 0xB0000000);
-            g.drawString(mc.font, label, tx, ty, 0xFF000000 | (pe.color & 0xFFFFFF));
+            tracer(g, x, y, z, pe.color);
         }
+    }
+
+    /** Linea dal mirino (centro dello schermo) al punto nel mondo. */
+    private static void tracer(GuiGraphics g, double wx, double wy, double wz, int rgb) {
+        if (!project(wx, wy, wz)) return;
+        float cx = sw / 2f, cy = sh / 2f;
+        float dx = (float) sx - cx, dy = (float) sy - cy;
+        float len = (float) Math.sqrt(dx * dx + dy * dy);
+        if (len < 1f) return;
+        len = Math.min(len, 6000f);
+        g.pose().pushMatrix();
+        g.pose().translate(cx, cy);
+        g.pose().rotate((float) Math.atan2(dy, dx));
+        g.fill(0, 0, (int) len, 1, 0xC0000000 | (rgb & 0xFFFFFF));
+        g.pose().popMatrix();
     }
 }

@@ -108,16 +108,22 @@ public class FreecamModule extends Module {
         if (o.keyJump.isDown()) u += 1;
         if (o.keyShift.isDown()) u -= 1;
 
-        double yr = Math.toRadians(yaw), pr = Math.toRadians(pitch);
-        double fx = -Math.sin(yr) * Math.cos(pr);
-        double fy = -Math.sin(pr);
-        double fz = Math.cos(yr) * Math.cos(pr);
+        // Come la spectator: W/S avanti/indietro sul piano orizzontale (ignora lo sguardo in alto/basso),
+        // A/D di lato, Space/Shift su/giu'.
+        double yr = Math.toRadians(yaw);
+        double fx = -Math.sin(yr);
+        double fz = Math.cos(yr);
         double rx = -Math.cos(yr);
         double rz = -Math.sin(yr);
+        double len = Math.sqrt(f * f + s * s);
+        if (len > 1) {
+            f /= len;
+            s /= len;
+        }
 
         double d = speed.value * dt;
         x += (fx * f + rx * s) * d;
-        y += (fy * f + u) * d;
+        y += u * d;
         z += (fz * f + rz * s) * d;
     }
 

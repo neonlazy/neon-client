@@ -31,6 +31,7 @@ public class BlockEspModule extends Module {
     private static final int RESCAN_TICKS = 100;
 
     public final NumberSetting range = new NumberSetting("Range (chunks)", 1, 16, 8, 1);
+    public final BoolSetting tracers = new BoolSetting("Tracers", false);
     public final Set<String> selected = new LinkedHashSet<>();
 
     private static final class ChunkData {
@@ -49,6 +50,7 @@ public class BlockEspModule extends Module {
         hasColor = true;
         color = 0xFFFFFF;
         settings.add(range);
+        bools.add(tracers);
     }
 
     public BlockPos[] snapshot() {

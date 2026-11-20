@@ -4,6 +4,7 @@ import dev.neonclient.NeonClient;
 import dev.neonclient.NeonConfig;
 import dev.neonclient.NeonConfig.Style;
 import dev.neonclient.module.BlockEspModule;
+import dev.neonclient.module.BoolSetting;
 import dev.neonclient.module.Category;
 import dev.neonclient.module.Module;
 import dev.neonclient.module.ModuleManager;
@@ -25,6 +26,10 @@ public class NeonScreen extends Screen {
     private static final int COL_W = 80;
     private static final int GAP = 5;
     private static final int ROW = 11;
+    /** Scala della GUI (0.75 = 25% piu' piccola). */
+    static final float SCALE = 0.75f;
+    /** Centro orizzontale dei contenuti, leggermente a sinistra del centro schermo. */
+    static final float ANCHOR = 0.42f;
 
     private Ui ui;
     private int tab = 0;
@@ -76,7 +81,7 @@ public class NeonScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         if (ui == null) ui = new Ui(this.font);
-        ui.beginFrame(mouseX, mouseY);
+        ui.beginFrame((int) (mouseX / SCALE), (int) (mouseY / SCALE));
 
         long win = GLFW.glfwGetCurrentContext();
         boolean[] down = new boolean[prevKeys.length];
@@ -101,7 +106,9 @@ public class NeonScreen extends Screen {
         }
         System.arraycopy(down, 0, prevKeys, 0, down.length);
 
-        int w = this.width, h = this.height;
+        int w = (int) Math.ceil(this.width / SCALE), h = (int) Math.ceil(this.height / SCALE);
+        g.pose().pushMatrix();
+        g.pose().scale(SCALE, SCALE);
         boolean popup = settingsModule != null;
         boolean lp = ui.lp, rp = ui.rp;
         if (popup) ui.consume(); // lo sfondo non riceve click mentre il popup e' aperto
@@ -111,7 +118,7 @@ public class NeonScreen extends Screen {
 
         if (tab == 0) drawModules(g, w, h);
         else if (tab == 2) drawCustomize(g, w);
-        else g.drawCenteredString(this.font, "Empty for now", w / 2, 50, Ui.TEXT_FAINT);
+        else g.drawCenteredString(this.font, "Empty for now", (int) (w * ANCHOR), 50, Ui.TEXT_FAINT);
         drawWatermark(g, w, h);
 
         if (popup) {
@@ -120,6 +127,12 @@ public class NeonScreen extends Screen {
             g.nextStratum();
             drawPopup(g, w, h);
         }
+        g.pose().popMatrix();
+    }
+
+    /** X di partenza per un contenuto largo contentW, centrato sull'ancora (un po' a sinistra). */
+    static int anchorX(int w, int contentW) {
+        return Math.max(6, (int) (w * ANCHOR) - contentW / 2);
     }
 
     // ------------------------------------------------------------------ background
@@ -189,7 +202,7 @@ public class NeonScreen extends Screen {
     private void drawTabs(GuiGraphics g, int w) {
         int total = 0;
         for (String t : TABS) total += this.font.width(t) + 14;
-        int x = (w - total) / 2;
+        int x = anchorX(w, total);
         g.fill(x, 2, x + total, 17, 0xE0161722);
         for (int i = 0; i < TABS.length; i++) {
             int tw = this.font.width(TABS[i]) + 14;
@@ -210,7 +223,7 @@ public class NeonScreen extends Screen {
         for (int start = 0; start < COLUMNS.length; start += perRow) {
             int count = Math.min(perRow, COLUMNS.length - start);
             int rowW = count * COL_W + (count - 1) * GAP;
-            int x = (w - rowW) / 2;
+            int x = anchorX(w, rowW);
             int tallest = 0;
             for (int i = 0; i < count; i++) {
                 int ph = drawCategory(g, COLUMNS[start + i], x + i * (COL_W + GAP), y);
@@ -265,6 +278,7 @@ public class NeonScreen extends Screen {
     private int popupHeight(Module m) {
         int h = 12 + 6;
         h += m.settings.size() * 16;
+        h += m.bools.size() * 18;
         if (m.hasColor) h += Ui.COLOR_EDITOR_H + 4;
         if (m instanceof BlockEspModule) h += 18;
         h += 18 + 14 + 6;
@@ -275,7 +289,7 @@ public class NeonScreen extends Screen {
         Module m = settingsModule;
         int pw = 170;
         int ph = popupHeight(m);
-        int x0 = (w - pw) / 2, y0 = Math.max(20, (h - ph) / 2);
+        int x0 = anchorX(w, pw), y0 = Math.max(20, (h - ph) / 2);
 
         g.fill(0, 0, w, h, 0x70000000);
         ui.panel(g, x0, y0, pw, ph, m.name, "x");
@@ -286,6 +300,14 @@ public class NeonScreen extends Screen {
         for (NumberSetting s : m.settings) {
             s.set(ui.slider(g, "set:" + s.name, cx, cy, cw, s.name, s.min, s.max, s.value, s.step));
             cy += 16;
+        }
+
+        for (BoolSetting b : m.bools) {
+            if (ui.button(g, cx, cy, cw, 14, b.name + ": " + (b.value ? "ON" : "OFF"), b.value)) {
+                b.value = !b.value;
+                NeonConfig.save();
+            }
+            cy += 18;
         }
 
         if (m.hasColor) {
@@ -326,7 +348,7 @@ public class NeonScreen extends Screen {
         boolean grad = NeonConfig.style() == Style.GRADIENT;
         int pw = 190;
         int ph = 12 + 6 + 10 + 18 + Ui.COLOR_EDITOR_H + 6 + (grad ? Ui.COLOR_EDITOR_H + 6 : 0);
-        int x0 = (w - pw) / 2, y0 = 26;
+        int x0 = anchorX(w, pw), y0 = 26;
         ui.panel(g, x0, y0, pw, ph, "Customize", "");
 
         int cx = x0 + 6, cw = pw - 12;

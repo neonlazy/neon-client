@@ -2,6 +2,7 @@ package dev.neonclient;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import dev.neonclient.module.BoolSetting;
 import dev.neonclient.module.Module;
 import dev.neonclient.module.ModuleManager;
 import dev.neonclient.module.NumberSetting;
@@ -59,6 +60,7 @@ public class NeonConfig {
             md.color = m.hasColor ? m.color : -1;
             md.blocks = m.getList();
             for (NumberSetting s : m.settings) md.settings.put(s.name, s.value);
+            for (BoolSetting b : m.bools) md.settings.put("bool:" + b.name, b.value ? 1.0 : 0.0);
         }
         try (Writer w = Files.newBufferedWriter(FILE)) {
             GSON.toJson(data, w);
@@ -77,6 +79,10 @@ public class NeonConfig {
         for (NumberSetting s : m.settings) {
             Double v = md.settings.get(s.name);
             if (v != null) s.set(v);
+        }
+        for (BoolSetting b : m.bools) {
+            Double v = md.settings.get("bool:" + b.name);
+            if (v != null) b.value = v != 0;
         }
     }
 
