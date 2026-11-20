@@ -1,8 +1,8 @@
 package dev.neonclient.gui;
 
 import dev.neonclient.NeonConfig;
-import dev.neonclient.module.BlockCatalog;
-import dev.neonclient.module.BlockEspModule;
+import dev.neonclient.module.Catalog;
+import dev.neonclient.module.SelectionModule;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -15,12 +15,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Selettore blocchi per Block ESP: ricerca per nome (italiano/inglese o id), tutti i blocchi del gioco. */
-public class BlockPickerScreen extends Screen {
+/** Selettore per gli ESP (blocchi, mob, oggetti): ricerca per nome nella lingua del gioco o per id. */
+public class PickerScreen extends Screen {
     private static final int ROW = 18;
 
     private final Screen parent;
-    private final BlockEspModule module;
+    private final SelectionModule module;
     private Ui ui;
     private EditBox search;
     private String query = "";
@@ -35,8 +35,8 @@ public class BlockPickerScreen extends Screen {
     // layout
     private int vw, vh, px, py, pw, ph, listY, listH;
 
-    public BlockPickerScreen(Screen parent, BlockEspModule module) {
-        super(Component.literal("Block ESP"));
+    public PickerScreen(Screen parent, SelectionModule module) {
+        super(Component.literal(module.name));
         this.parent = parent;
         this.module = module;
     }
@@ -52,7 +52,7 @@ public class BlockPickerScreen extends Screen {
         py = 15;
 
         search = new EditBox(this.font, px + 6, py + 17, pw - 12, 14, Component.literal("Search"));
-        search.setHint(Component.literal("Search block..."));
+        search.setHint(Component.literal("Search " + module.noun() + "..."));
         search.setMaxLength(64);
         search.setValue(query);
         search.setResponder(s -> {
@@ -86,19 +86,31 @@ public class BlockPickerScreen extends Screen {
         return true;
     }
 
-    private String nameOf(BlockCatalog.Entry e) {
-        return names.computeIfAbsent(e.id(), k -> e.block().getName().getString());
+    private String nameOf(Catalog.Entry e) {
+        return names.computeIfAbsent(e.id(), k -> {
+            try {
+                return e.name().get();
+            } catch (Exception ex) {
+                return e.shortName();
+            }
+        });
     }
 
-    private ItemStack iconOf(BlockCatalog.Entry e) {
-        return icons.computeIfAbsent(e.id(), k -> new ItemStack(e.block()));
+    private ItemStack iconOf(Catalog.Entry e) {
+        return icons.computeIfAbsent(e.id(), k -> {
+            try {
+                return e.icon().get();
+            } catch (Exception ex) {
+                return ItemStack.EMPTY;
+            }
+        });
     }
 
-    private List<BlockCatalog.Entry> visible() {
+    private List<Catalog.Entry> visible() {
         String q = query.toLowerCase().trim();
         String qId = q.replace(' ', '_');
-        List<BlockCatalog.Entry> out = new ArrayList<>();
-        for (BlockCatalog.Entry e : BlockCatalog.all()) {
+        List<Catalog.Entry> out = new ArrayList<>();
+        for (Catalog.Entry e : module.catalog()) {
             if (onlySelected && !module.isSelected(e.id())) continue;
             if (!q.isEmpty() && !e.id().contains(qId) && !nameOf(e).toLowerCase().contains(q)) continue;
             out.add(e);
@@ -116,7 +128,7 @@ public class BlockPickerScreen extends Screen {
         g.pose().pushMatrix();
         g.pose().scale(NeonScreen.SCALE, NeonScreen.SCALE);
         g.fill(0, 0, vw, vh, 0xA0050308);
-        ui.panel(g, px, py, pw, ph, "Block ESP  -  select blocks", module.selected.size() + " selected");
+        ui.panel(g, px, py, pw, ph, module.name + "  -  select " + module.noun(), module.selected.size() + " selected");
 
         // filtri
         int fy = py + 35;
@@ -126,7 +138,7 @@ public class BlockPickerScreen extends Screen {
         if (ui.button(g, px + 6 + 2 * (bw + 3), fy, bw, 14, "Clear all", false)) module.clearSelection();
 
         // lista
-        List<BlockCatalog.Entry> list = visible();
+        List<Catalog.Entry> list = visible();
         int contentH = list.size() * ROW;
         double maxScroll = Math.max(0, contentH - listH);
         scroll = Math.max(0, Math.min(maxScroll, scroll));
@@ -138,7 +150,7 @@ public class BlockPickerScreen extends Screen {
         int last = Math.min(list.size(), first + listH / ROW + 2);
         boolean inList = Ui.in(ui.mx, ui.my, lx, listY, lw, listH);
         for (int i = first; i < last; i++) {
-            BlockCatalog.Entry e = list.get(i);
+            Catalog.Entry e = list.get(i);
             int ry = listY + i * ROW - (int) scroll;
             boolean sel = module.isSelected(e.id());
             boolean hov = inList && Ui.in(ui.mx, ui.my, lx, ry, lw, ROW);
@@ -155,11 +167,11 @@ public class BlockPickerScreen extends Screen {
             g.drawString(this.font, id, lx + lw - 6 - this.font.width(id) - 12, ry + 5, Ui.TEXT_FAINT);
             g.drawString(this.font, sel ? "✔" : "+", lx + lw - 12, ry + 5,
                     sel ? Ui.argb(Ui.accent(), 0xFF) : Ui.TEXT_FAINT);
-            if (hov && ui.lp) module.toggleBlock(e.id());
+            if (hov && ui.lp) module.toggleEntry(e.id());
         }
         g.disableScissor();
         if (list.isEmpty()) {
-            g.drawCenteredString(this.font, "No blocks found", lx + lw / 2, listY + 10, Ui.TEXT_FAINT);
+            g.drawCenteredString(this.font, "No " + module.noun() + " found", lx + lw / 2, listY + 10, Ui.TEXT_FAINT);
         }
 
         // barra di scorrimento
@@ -178,7 +190,8 @@ public class BlockPickerScreen extends Screen {
         }
 
         // footer
-        String info = list.size() + " / " + BlockCatalog.all().size() + " blocks";
+        String info = list.size() + " / " + module.catalog().size() + " " + module.noun();
+        if (module.emptyMeansAll() && module.selected.isEmpty()) info += "  -  none selected = all";
         g.drawString(this.font, info, px + 6, py + ph - 15, Ui.TEXT_FAINT);
         boolean done = ui.button(g, px + pw - 66, py + ph - 18, 60, 14, "Done", false);
 

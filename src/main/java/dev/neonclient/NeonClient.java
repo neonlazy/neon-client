@@ -13,6 +13,7 @@ public class NeonClient implements ClientModInitializer {
     public static final String NAME = "Neon Client";
 
     private static boolean prevOpenKey;
+    private static boolean cullChanged;
     private static String version = "?";
 
     public static String version() {
@@ -51,5 +52,16 @@ public class NeonClient implements ClientModInitializer {
         }
 
         ModuleManager.tick();
+
+        // Freecam e Block ESP: senza culling delle caverne vengono disegnate anche le zone
+        // sotto terra / dietro i muri (e le entita' al loro interno, come i blocchi glowing).
+        boolean noCull = ModuleManager.FREECAM.isActive() || ModuleManager.BLOCK_ESP.enabled;
+        if (noCull) {
+            mc.smartCull = false;
+            cullChanged = true;
+        } else if (cullChanged) {
+            mc.smartCull = true;
+            cullChanged = false;
+        }
     }
 }

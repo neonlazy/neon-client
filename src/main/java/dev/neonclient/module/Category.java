@@ -1,12 +1,13 @@
 package dev.neonclient.module;
 
+/** Categorie in ordine alfabetico; Favorites resta in fondo (la colonna Search e' gestita dalla GUI). */
 public enum Category {
-    MOVEMENT("Movement"),
     COMBAT("Combat"),
-    WORLD("World"),
+    MISC("Misc"),
+    MOVEMENT("Movement"),
     PLAYER("Player"),
     RENDER("Render"),
-    MISC("Misc"),
+    WORLD("World"),
     FAVORITES("Favorites");
 
     public final String label;

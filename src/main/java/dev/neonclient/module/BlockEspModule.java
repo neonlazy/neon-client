@@ -1,5 +1,6 @@
 package dev.neonclient.module;
 
+import dev.neonclient.esp.BlockGlow;
 import dev.neonclient.esp.EspRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -15,24 +16,23 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Evidenzia i blocchi scelti leggendo i dati dei chunk gia' ricevuti dal client:
- * funziona attraverso i muri e anche per sezioni non ancora disegnate.
+ * Blocchi scelti con effetto glowing, letti dai dati dei chunk gia' ricevuti dal client:
+ * funziona attraverso i muri e anche per zone non ancora disegnate.
  */
-public class BlockEspModule extends Module {
-    private static final int PER_CHUNK_CAP = 150;
-    private static final int SNAPSHOT_CAP = 3000;
+public class BlockEspModule extends SelectionModule {
+    /** Numero massimo di blocchi evidenziati (i piu' vicini). */
+    public static final int MAX_BLOCKS = 320;
+    private static final int PER_CHUNK_CAP = 320;
     private static final int SCANS_PER_TICK = 4;
     private static final int RESCAN_TICKS = 100;
 
     public final NumberSetting range = new NumberSetting("Range (chunks)", 1, 16, 8, 1);
     public final BoolSetting tracers = new BoolSetting("Tracers", false);
-    public final Set<String> selected = new LinkedHashSet<>();
 
     private static final class ChunkData {
         List<BlockPos> list = new ArrayList<>();
@@ -40,7 +40,6 @@ public class BlockEspModule extends Module {
     }
 
     private Set<Block> targets = new HashSet<>();
-    private boolean dirty = true;
     private final Map<Long, ChunkData> cache = new HashMap<>();
     private BlockPos[] snapshot = new BlockPos[0];
     private int tickCount;
@@ -53,34 +52,19 @@ public class BlockEspModule extends Module {
         bools.add(tracers);
     }
 
+    @Override
+    public List<Catalog.Entry> catalog() {
+        return Catalog.blocks();
+    }
+
+    @Override
+    public String noun() {
+        return "blocks";
+    }
+
+    /** Blocchi evidenziati, dal piu' vicino. */
     public BlockPos[] snapshot() {
         return snapshot;
-    }
-
-    public boolean isSelected(String id) {
-        return selected.contains(id);
-    }
-
-    public void toggleBlock(String id) {
-        if (!selected.remove(id)) selected.add(id);
-        dirty = true;
-    }
-
-    public void clearSelection() {
-        selected.clear();
-        dirty = true;
-    }
-
-    @Override
-    public List<String> getList() {
-        return new ArrayList<>(selected);
-    }
-
-    @Override
-    public void setList(List<String> list) {
-        selected.clear();
-        selected.addAll(list);
-        dirty = true;
     }
 
     @Override
@@ -92,6 +76,7 @@ public class BlockEspModule extends Module {
     protected void onDisable() {
         cache.clear();
         snapshot = new BlockPos[0];
+        BlockGlow.clear();
     }
 
     @Override
@@ -108,7 +93,7 @@ public class BlockEspModule extends Module {
         if (dirty) {
             Set<Block> t = new HashSet<>();
             for (String id : selected) {
-                Block b = BlockCatalog.byId(id);
+                Block b = Catalog.block(id);
                 if (b != null) t.add(b);
             }
             targets = t;
@@ -116,7 +101,10 @@ public class BlockEspModule extends Module {
             snapshot = new BlockPos[0];
             dirty = false;
         }
-        if (targets.isEmpty()) return;
+        if (targets.isEmpty()) {
+            BlockGlow.sync(level, snapshot, color);
+            return;
+        }
 
         double cx = EspRenderer.haveCam ? EspRenderer.camX : mc.player.getX();
         double cy = EspRenderer.haveCam ? EspRenderer.camY : mc.player.getY();
@@ -155,7 +143,8 @@ public class BlockEspModule extends Module {
             cache.put(key(c[0], c[1]), d);
         }
 
-        if (tickCount % 10 == 0) rebuildSnapshot(cx, cy, cz);
+        if (tickCount % 10 == 0) rebuildSnapshot(level, cx, cy, cz);
+        BlockGlow.sync(level, snapshot, color);
     }
 
     private static long key(int cx, int cz) {
@@ -186,12 +175,18 @@ public class BlockEspModule extends Module {
         }
     }
 
-    private void rebuildSnapshot(double cx, double cy, double cz) {
+    private void rebuildSnapshot(ClientLevel level, double cx, double cy, double cz) {
         List<BlockPos> all = new ArrayList<>();
         for (ChunkData d : cache.values()) all.addAll(d.list);
         all.sort((a, b) -> Double.compare(dist2(a, cx, cy, cz), dist2(b, cx, cy, cz)));
-        int n = Math.min(SNAPSHOT_CAP, all.size());
-        snapshot = all.subList(0, n).toArray(new BlockPos[0]);
+        List<BlockPos> out = new ArrayList<>();
+        for (BlockPos p : all) {
+            // scarta i blocchi rotti/cambiati dall'ultima scansione
+            if (!targets.contains(level.getBlockState(p).getBlock())) continue;
+            out.add(p);
+            if (out.size() >= MAX_BLOCKS) break;
+        }
+        snapshot = out.toArray(new BlockPos[0]);
     }
 
     private static double dist2(BlockPos p, double cx, double cy, double cz) {

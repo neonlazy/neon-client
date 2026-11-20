@@ -77,8 +77,18 @@ public final class Ui {
     public void panel(GuiGraphics g, int x, int y, int w, int h, String title, String right) {
         int acc = accent();
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, argb(acc, 0x50));
-        g.fill(x, y, x + w, y + h, PANEL_BG);
+        panelBody(g, x, y, w, h);
         header(g, x, y, w, title, right);
+    }
+
+    /** Sfondo del pannello secondo lo stile scelto in Customize. */
+    public static void panelBody(GuiGraphics g, int x, int y, int w, int h) {
+        switch (NeonConfig.panelStyle()) {
+            case GRADIENT -> g.fillGradient(x, y, x + w, y + h,
+                    argb(NeonConfig.panelColor1(), 0xEE), argb(NeonConfig.panelColor2(), 0xEE));
+            case GLASS -> g.fill(x, y, x + w, y + h, argb(NeonConfig.panelColor1(), 0x90));
+            default -> g.fill(x, y, x + w, y + h, argb(NeonConfig.panelColor1(), 0xEE));
+        }
     }
 
     public void header(GuiGraphics g, int x, int y, int w, String title, String right) {

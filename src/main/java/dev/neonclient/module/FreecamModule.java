@@ -22,7 +22,6 @@ public class FreecamModule extends Module {
     private ClientInput savedInput;
     private final ClientInput frozenInput = new ClientInput();
     private CameraType savedType;
-    private boolean savedCull = true;
 
     public FreecamModule() {
         super("Freecam", Category.RENDER);
@@ -56,16 +55,12 @@ public class FreecamModule extends Module {
         // Terza persona: il corpo viene disegnato e la mano in prima persona sparisce.
         savedType = mc.options.getCameraType();
         mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-        // Senza culling delle caverne vengono disegnate anche le sezioni sotto terra / dietro i muri.
-        savedCull = mc.smartCull;
-        mc.smartCull = false;
         last = System.nanoTime();
     }
 
     @Override
     protected void onDisable() {
         Minecraft mc = Minecraft.getInstance();
-        mc.smartCull = savedCull;
         if (owner != null && mc.player == owner && owner.input == frozenInput && savedInput != null) {
             owner.input = savedInput;
         }

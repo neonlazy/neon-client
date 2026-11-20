@@ -23,6 +23,13 @@ public class NeonConfig {
         Style(String label) { this.label = label; }
     }
 
+    /** Stile dei pannelli dei moduli (la parte scura). */
+    public enum PanelStyle {
+        SOLID("Solid"), GRADIENT("Gradient"), GLASS("Glass");
+        public final String label;
+        PanelStyle(String label) { this.label = label; }
+    }
+
     static class ModData {
         int key;
         boolean favorite;
@@ -35,6 +42,9 @@ public class NeonConfig {
         String style = Style.SOLID.name();
         int color1 = 0xA020F0;
         int color2 = 0x2B0A4F;
+        String panelStyle = PanelStyle.SOLID.name();
+        int panelColor1 = 0x0B0912;
+        int panelColor2 = 0x2A0F45;
         Map<String, ModData> modules = new HashMap<>();
     }
 
@@ -99,4 +109,18 @@ public class NeonConfig {
     public static int color2() { return data.color2 & 0xFFFFFF; }
     public static void setColor1(int rgb) { data.color1 = rgb & 0xFFFFFF; }
     public static void setColor2(int rgb) { data.color2 = rgb & 0xFFFFFF; }
+
+    public static PanelStyle panelStyle() {
+        try {
+            return PanelStyle.valueOf(data.panelStyle);
+        } catch (Exception e) {
+            return PanelStyle.SOLID;
+        }
+    }
+
+    public static void setPanelStyle(PanelStyle s) { data.panelStyle = s.name(); }
+    public static int panelColor1() { return data.panelColor1 & 0xFFFFFF; }
+    public static int panelColor2() { return data.panelColor2 & 0xFFFFFF; }
+    public static void setPanelColor1(int rgb) { data.panelColor1 = rgb & 0xFFFFFF; }
+    public static void setPanelColor2(int rgb) { data.panelColor2 = rgb & 0xFFFFFF; }
 }

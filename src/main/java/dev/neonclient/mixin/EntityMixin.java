@@ -1,10 +1,10 @@
 package dev.neonclient.mixin;
 
+import dev.neonclient.esp.EspGlow;
 import dev.neonclient.module.FreecamModule;
 import dev.neonclient.module.ModuleManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -23,12 +23,10 @@ public abstract class EntityMixin {
         }
     }
 
-    /** Colore del contorno glowing dei giocatori (Player ESP). */
+    /** Colore del contorno glowing degli ESP. */
     @Inject(method = "getTeamColor", at = @At("HEAD"), cancellable = true)
     private void neon$espColor(CallbackInfoReturnable<Integer> cir) {
-        if (ModuleManager.PLAYER_ESP.enabled && (Object) this instanceof Player
-                && (Object) this != Minecraft.getInstance().player) {
-            cir.setReturnValue(ModuleManager.PLAYER_ESP.glowColor());
-        }
+        int c = EspGlow.colorFor((Entity) (Object) this);
+        if (c >= 0) cir.setReturnValue(c);
     }
 }

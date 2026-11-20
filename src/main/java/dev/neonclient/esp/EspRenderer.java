@@ -1,12 +1,15 @@
 package dev.neonclient.esp;
 
 import dev.neonclient.module.BlockEspModule;
+import dev.neonclient.module.EntityEspModule;
+import dev.neonclient.module.ItemEspModule;
 import dev.neonclient.module.ModuleManager;
 import dev.neonclient.module.PlayerEspModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
@@ -29,16 +32,29 @@ public final class EspRenderer {
     private EspRenderer() {}
 
     public static void render(GuiGraphics g, float partialTick) {
-        PlayerEspModule pe = ModuleManager.PLAYER_ESP;
-        BlockEspModule be = ModuleManager.BLOCK_ESP;
-        if (!pe.enabled && !be.enabled) return;
-
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.options.hideGui) return;
-        if (!prepare(g, mc, partialTick)) return;
 
-        if (be.enabled) drawBlocks(g, be);
-        if (pe.enabled) drawPlayers(g, mc, pe, partialTick);
+        BlockEspModule be = ModuleManager.BLOCK_ESP;
+        PlayerEspModule pe = ModuleManager.PLAYER_ESP;
+        EntityEspModule ee = ModuleManager.ENTITY_ESP;
+        ItemEspModule ie = ModuleManager.ITEM_ESP;
+        boolean any = be.enabled || (pe.enabled && pe.tracers.value) || (ee.enabled && ee.tracers.value)
+                || (ie.enabled && ie.tracers.value);
+
+        if (any && prepare(g, mc, partialTick)) {
+            if (be.enabled) drawBlocks(g, mc, be);
+            if ((pe.enabled && pe.tracers.value) || (ee.enabled && ee.tracers.value) || (ie.enabled && ie.tracers.value)) {
+                drawEntityTracers(g, mc, partialTick);
+            }
+        }
+
+        // in freecam la visuale e' in terza persona (niente mirino vanilla): ne disegniamo uno
+        if (ModuleManager.FREECAM.isActive() && mc.screen == null) {
+            int cx = g.guiWidth() / 2, cy = g.guiHeight() / 2;
+            g.fill(cx - 4, cy, cx + 5, cy + 1, 0xE0FFFFFF);
+            g.fill(cx, cy - 4, cx + 1, cy + 5, 0xE0FFFFFF);
+        }
     }
 
     private static boolean prepare(GuiGraphics g, Minecraft mc, float pt) {
@@ -115,34 +131,43 @@ public final class EspRenderer {
         g.fill(bx2, by1, bx2 + 1, by2 + 1, c);
     }
 
-    private static final int BLOCK_TRACER_CAP = 150;
-
-    private static void drawBlocks(GuiGraphics g, BlockEspModule be) {
+    /**
+     * Il glowing dei blocchi lo fanno le entita' di BlockGlow; qui un riquadro solo per i blocchi
+     * senza modello (barrier, acqua, lava, light...) e le linee tracker.
+     */
+    private static void drawBlocks(GuiGraphics g, Minecraft mc, BlockEspModule be) {
         int rgb = be.color;
-        BlockPos[] list = be.snapshot();
-        for (BlockPos p : list) {
-            if (!projectBox(p.getX(), p.getY(), p.getZ(), p.getX() + 1.0, p.getY() + 1.0, p.getZ() + 1.0)) continue;
-            outline(g, rgb, 0x20);
-        }
-        if (be.tracers.value) {
-            // la lista e' gia' ordinata dal piu' vicino: le linee vanno solo ai primi blocchi
-            int n = Math.min(BLOCK_TRACER_CAP, list.length);
-            for (int i = 0; i < n; i++) {
-                BlockPos p = list[i];
-                tracer(g, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, rgb);
+        for (BlockPos p : be.snapshot()) {
+            if (!BlockGlow.canGlow(mc.level.getBlockState(p))
+                    && projectBox(p.getX(), p.getY(), p.getZ(), p.getX() + 1.0, p.getY() + 1.0, p.getZ() + 1.0)) {
+                outline(g, rgb, 0x20);
             }
+            if (be.tracers.value) tracer(g, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, rgb);
         }
     }
 
-    /** Il contorno dei giocatori e' l'effetto glowing vanilla (vedi mixin); qui solo le linee tracker. */
-    private static void drawPlayers(GuiGraphics g, Minecraft mc, PlayerEspModule pe, float pt) {
-        if (!pe.tracers.value) return;
-        for (Player p : mc.level.players()) {
-            if (p == mc.player) continue;
-            double x = Mth.lerp(pt, p.xo, p.getX());
-            double y = Mth.lerp(pt, p.yo, p.getY()) + p.getBbHeight() / 2.0;
-            double z = Mth.lerp(pt, p.zo, p.getZ());
-            tracer(g, x, y, z, pe.color);
+    /** Linee tracker verso giocatori, mob e oggetti (ognuno col colore del suo modulo). */
+    private static void drawEntityTracers(GuiGraphics g, Minecraft mc, float pt) {
+        PlayerEspModule pe = ModuleManager.PLAYER_ESP;
+        EntityEspModule ee = ModuleManager.ENTITY_ESP;
+        ItemEspModule ie = ModuleManager.ITEM_ESP;
+        for (Entity e : mc.level.entitiesForRendering()) {
+            if (e == mc.player || BlockGlow.isOurs(e)) continue;
+            int rgb;
+            if (e instanceof Player) {
+                if (!(pe.enabled && pe.tracers.value)) continue;
+                rgb = pe.color;
+            } else if (ee.enabled && ee.tracers.value && ee.matches(e)) {
+                rgb = ee.color;
+            } else if (ie.enabled && ie.tracers.value && ie.matches(e)) {
+                rgb = ie.color;
+            } else {
+                continue;
+            }
+            double x = Mth.lerp(pt, e.xo, e.getX());
+            double y = Mth.lerp(pt, e.yo, e.getY()) + e.getBbHeight() / 2.0;
+            double z = Mth.lerp(pt, e.zo, e.getZ());
+            tracer(g, x, y, z, rgb);
         }
     }
 

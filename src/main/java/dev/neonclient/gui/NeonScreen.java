@@ -3,12 +3,13 @@ package dev.neonclient.gui;
 import dev.neonclient.NeonClient;
 import dev.neonclient.NeonConfig;
 import dev.neonclient.NeonConfig.Style;
-import dev.neonclient.module.BlockEspModule;
 import dev.neonclient.module.BoolSetting;
 import dev.neonclient.module.Category;
 import dev.neonclient.module.Module;
 import dev.neonclient.module.ModuleManager;
 import dev.neonclient.module.NumberSetting;
+import dev.neonclient.module.SelectionModule;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -18,21 +19,27 @@ import java.util.List;
 import java.util.Random;
 
 public class NeonScreen extends Screen {
-    private static final String[] TABS = {"Modules", "Config", "Customize", "Macros", "Profiles"};
+    private static final String[] TABS = {"Config", "Customize", "Macros", "Modules", "Profiles"};
+    private static final int TAB_CUSTOMIZE = 1;
+    private static final int TAB_MODULES = 3;
+    /** Colonne in ordine alfabetico; null = colonna Search (subito prima di Favorites). */
     private static final Category[] COLUMNS = {
-            Category.MOVEMENT, Category.COMBAT, Category.WORLD, Category.PLAYER,
-            Category.RENDER, Category.MISC, Category.FAVORITES};
+            Category.COMBAT, Category.MISC, Category.MOVEMENT, Category.PLAYER,
+            Category.RENDER, Category.WORLD, null, Category.FAVORITES};
 
     private static final int COL_W = 80;
     private static final int GAP = 5;
     private static final int ROW = 11;
     /** Scala della GUI (0.75 = 25% piu' piccola). */
-    static final float SCALE = 0.75f;
+    static final float SCALE = 0.5625f;
     /** Centro orizzontale dei contenuti, leggermente a sinistra del centro schermo. */
-    static final float ANCHOR = 0.42f;
+    static final float ANCHOR = 0.34f;
 
     private Ui ui;
-    private int tab = 0;
+    private int tab = TAB_MODULES;
+    private EditBox searchBox;
+    private String searchQuery = "";
+    private int sbX, sbY, sbW;
     private Module settingsModule;
     private boolean listening;
     private final boolean[] prevKeys = new boolean[GLFW.GLFW_KEY_LAST + 1];
@@ -54,6 +61,18 @@ public class NeonScreen extends Screen {
     @Override
     protected void init() {
         if (ui == null) ui = new Ui(this.font);
+        searchBox = new EditBox(this.font, 0, 0, COL_W - 8, 10, Component.literal("Search"));
+        searchBox.setBordered(false);
+        searchBox.setMaxLength(32);
+        searchBox.setHint(Component.literal("Search..."));
+        searchBox.setValue(searchQuery);
+        searchBox.setResponder(v -> searchQuery = v);
+        searchBox.visible = false;
+        this.addRenderableWidget(searchBox);
+    }
+
+    private boolean typing() {
+        return searchBox != null && this.getFocused() == searchBox;
     }
 
     @Override
@@ -99,7 +118,7 @@ public class NeonScreen extends Screen {
                     break;
                 }
             }
-        } else if (down[GLFW.GLFW_KEY_RIGHT_SHIFT] && !prevKeys[GLFW.GLFW_KEY_RIGHT_SHIFT]) {
+        } else if (!typing() && down[GLFW.GLFW_KEY_RIGHT_SHIFT] && !prevKeys[GLFW.GLFW_KEY_RIGHT_SHIFT]) {
             System.arraycopy(down, 0, prevKeys, 0, down.length);
             this.onClose();
             return;
@@ -113,13 +132,21 @@ public class NeonScreen extends Screen {
         boolean lp = ui.lp, rp = ui.rp;
         if (popup) ui.consume(); // lo sfondo non riceve click mentre il popup e' aperto
 
+        // la barra di ricerca si attiva cliccandoci sopra, si disattiva cliccando altrove
+        if (ui.lp && searchBox != null) {
+            boolean onBox = searchBox.visible && ui.hover(sbX, sbY, sbW, 12);
+            this.setFocused(onBox ? searchBox : null);
+        }
+        if (searchBox != null) searchBox.visible = false;
+
         drawBackground(g, w, h);
         drawTabs(g, w);
 
-        if (tab == 0) drawModules(g, w, h);
-        else if (tab == 2) drawCustomize(g, w);
-        else g.drawCenteredString(this.font, "Empty for now", (int) (w * ANCHOR), 50, Ui.TEXT_FAINT);
+        if (tab == TAB_MODULES) drawModules(g, w, h);
+        else if (tab == TAB_CUSTOMIZE) drawCustomize(g, w);
+        else g.drawCenteredString(this.font, "Empty for now", w / 2, 50, Ui.TEXT_FAINT);
         drawWatermark(g, w, h);
+        super.render(g, ui.mx, ui.my, partialTick);
 
         if (popup) {
             ui.lp = lp;
@@ -202,7 +229,7 @@ public class NeonScreen extends Screen {
     private void drawTabs(GuiGraphics g, int w) {
         int total = 0;
         for (String t : TABS) total += this.font.width(t) + 14;
-        int x = anchorX(w, total);
+        int x = (w - total) / 2;
         g.fill(x, 2, x + total, 17, 0xE0161722);
         for (int i = 0; i < TABS.length; i++) {
             int tw = this.font.width(TABS[i]) + 14;
@@ -235,12 +262,27 @@ public class NeonScreen extends Screen {
     }
 
     private int drawCategory(GuiGraphics g, Category c, int x, int y) {
-        List<Module> mods = ModuleManager.byCategory(c);
-        int bodyH = mods.isEmpty() ? 4 : mods.size() * ROW + 4;
+        boolean search = c == null;
+        List<Module> mods = search ? ModuleManager.search(searchQuery) : ModuleManager.byCategory(c);
+        int top = search ? 16 : 0; // spazio per la barra di ricerca
+        int bodyH = top + (mods.isEmpty() ? 4 : mods.size() * ROW + 4);
         int ph = 12 + bodyH;
-        ui.panel(g, x, y, COL_W, ph, c.label, String.valueOf(mods.size()));
+        ui.panel(g, x, y, COL_W, ph, search ? "Search" : c.label, search ? "" : String.valueOf(mods.size()));
 
-        int ry = y + 14;
+        if (search && searchBox != null) {
+            sbX = x + 3;
+            sbY = y + 15;
+            sbW = COL_W - 6;
+            boolean focused = typing();
+            g.fill(sbX, sbY, sbX + sbW, sbY + 12, Ui.WIDGET_BG);
+            g.fill(sbX, sbY + 11, sbX + sbW, sbY + 12, Ui.argb(Ui.accent(), focused ? 0xFF : 0x60));
+            searchBox.setX(sbX + 3);
+            searchBox.setY(sbY + 2);
+            searchBox.setWidth(sbW - 6);
+            searchBox.visible = settingsModule == null;
+        }
+
+        int ry = y + 14 + top;
         for (Module m : mods) {
             boolean hov = ui.hover(x, ry, COL_W, ROW);
             if (m.enabled) {
@@ -280,7 +322,7 @@ public class NeonScreen extends Screen {
         h += m.settings.size() * 16;
         h += m.bools.size() * 18;
         if (m.hasColor) h += Ui.COLOR_EDITOR_H + 4;
-        if (m instanceof BlockEspModule) h += 18;
+        if (m instanceof SelectionModule) h += 18;
         h += 18 + 14 + 6;
         return h;
     }
@@ -315,12 +357,13 @@ public class NeonScreen extends Screen {
             cy += Ui.COLOR_EDITOR_H + 4;
         }
 
-        if (m instanceof BlockEspModule) {
-            BlockEspModule be = (BlockEspModule) m;
-            if (ui.button(g, cx, cy, cw, 14, "Select blocks (" + be.selected.size() + ")", false)) {
+        if (m instanceof SelectionModule) {
+            SelectionModule sm = (SelectionModule) m;
+            String count = sm.selected.isEmpty() && sm.emptyMeansAll() ? "all" : String.valueOf(sm.selected.size());
+            if (ui.button(g, cx, cy, cw, 14, "Select " + sm.noun() + " (" + count + ")", false)) {
                 ui.consume();
                 NeonConfig.save();
-                this.minecraft.setScreen(new BlockPickerScreen(this, be));
+                this.minecraft.setScreen(new PickerScreen(this, sm));
                 return;
             }
             cy += 18;
@@ -345,14 +388,14 @@ public class NeonScreen extends Screen {
     // ------------------------------------------------------------------ customize
 
     private void drawCustomize(GuiGraphics g, int w) {
-        boolean grad = NeonConfig.style() == Style.GRADIENT;
-        int pw = 190;
-        int ph = 12 + 6 + 10 + 18 + Ui.COLOR_EDITOR_H + 6 + (grad ? Ui.COLOR_EDITOR_H + 6 : 0);
-        int x0 = anchorX(w, pw), y0 = 26;
-        ui.panel(g, x0, y0, pw, ph, "Customize", "");
+        int pw = 170, gap = 8;
+        int x0 = anchorX(w, pw * 2 + gap), y0 = 26;
 
-        int cx = x0 + 6, cw = pw - 12;
-        int cy = y0 + 18;
+        // --- sfondo della GUI
+        boolean grad = NeonConfig.style() == Style.GRADIENT;
+        int ph = 12 + 6 + 10 + 18 + Ui.COLOR_EDITOR_H + 6 + (grad ? Ui.COLOR_EDITOR_H + 6 : 0);
+        ui.panel(g, x0, y0, pw, ph, "Background", "");
+        int cx = x0 + 6, cw = pw - 12, cy = y0 + 18;
         g.drawString(this.font, "Style", cx, cy + 1, Ui.TEXT_DIM);
         cy += 10;
         Style[] styles = Style.values();
@@ -363,11 +406,30 @@ public class NeonScreen extends Screen {
             }
         }
         cy += 18;
-
         NeonConfig.setColor1(ui.colorEditor(g, "c1", cx, cy, cw, grad ? "Color 1" : "Color", NeonConfig.color1()));
         cy += Ui.COLOR_EDITOR_H + 6;
-        if (grad) {
-            NeonConfig.setColor2(ui.colorEditor(g, "c2", cx, cy, cw, "Color 2", NeonConfig.color2()));
+        if (grad) NeonConfig.setColor2(ui.colorEditor(g, "c2", cx, cy, cw, "Color 2", NeonConfig.color2()));
+
+        // --- pannelli dei moduli (la parte scura)
+        int x1 = x0 + pw + gap;
+        boolean pgrad = NeonConfig.panelStyle() == NeonConfig.PanelStyle.GRADIENT;
+        int ph2 = 12 + 6 + 10 + 18 + Ui.COLOR_EDITOR_H + 6 + (pgrad ? Ui.COLOR_EDITOR_H + 6 : 0);
+        ui.panel(g, x1, y0, pw, ph2, "Modules", "");
+        cx = x1 + 6;
+        cy = y0 + 18;
+        g.drawString(this.font, "Panel style", cx, cy + 1, Ui.TEXT_DIM);
+        cy += 10;
+        NeonConfig.PanelStyle[] ps = NeonConfig.PanelStyle.values();
+        bw = (cw - (ps.length - 1) * 3) / ps.length;
+        for (int i = 0; i < ps.length; i++) {
+            if (ui.button(g, cx + i * (bw + 3), cy, bw, 14, ps[i].label, NeonConfig.panelStyle() == ps[i])) {
+                NeonConfig.setPanelStyle(ps[i]);
+            }
         }
+        cy += 18;
+        NeonConfig.setPanelColor1(ui.colorEditor(g, "p1", cx, cy, cw, pgrad ? "Panel color 1" : "Panel color",
+                NeonConfig.panelColor1()));
+        cy += Ui.COLOR_EDITOR_H + 6;
+        if (pgrad) NeonConfig.setPanelColor2(ui.colorEditor(g, "p2", cx, cy, cw, "Panel color 2", NeonConfig.panelColor2()));
     }
 }
