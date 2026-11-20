@@ -6,14 +6,15 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 /** Mob (o le entita' scelte) con effetto glowing permanente + linee tracker opzionali. */
 public class EntityEspModule extends SelectionModule {
     public final BoolSetting tracers = new BoolSetting("Tracers", false);
-    private Set<EntityType<?>> types = new HashSet<>();
+    private Map<EntityType<?>, Integer> types = new HashMap<>();
+    private int cachedDefault = -1;
 
     public EntityEspModule() {
         super("Entity ESP", Category.RENDER);
@@ -37,18 +38,21 @@ public class EntityEspModule extends SelectionModule {
         return true;
     }
 
-    public boolean matches(Entity e) {
-        if (e instanceof Player || BlockGlow.isOurs(e)) return false;
-        if (dirty) {
-            Set<EntityType<?>> t = new HashSet<>();
+    /** Colore dell'entita', oppure -1 se non va evidenziata. */
+    public int colorFor(Entity e) {
+        if (e instanceof Player || BlockGlow.isOurs(e)) return -1;
+        if (dirty || cachedDefault != color) {
+            Map<EntityType<?>, Integer> t = new HashMap<>();
             for (String id : selected) {
                 EntityType<?> type = Catalog.entity(id);
-                if (type != null) t.add(type);
+                if (type != null) t.put(type, colorOf(id));
             }
             types = t;
+            cachedDefault = color;
             dirty = false;
         }
-        if (types.isEmpty()) return e instanceof Mob;
-        return types.contains(e.getType());
+        if (types.isEmpty()) return e instanceof Mob ? color : -1;
+        Integer c = types.get(e.getType());
+        return c != null ? c : -1;
     }
 }

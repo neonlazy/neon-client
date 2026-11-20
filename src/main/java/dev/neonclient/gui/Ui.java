@@ -67,6 +67,28 @@ public final class Ui {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
 
+    // ------------------------------------------------------------------ testo (col carattere scelto)
+
+    public void text(GuiGraphics g, String s, int x, int y, int color) {
+        g.drawString(font, NeonFont.of(s), x, y, color);
+    }
+
+    public void centered(GuiGraphics g, String s, int cx, int y, int color) {
+        g.drawCenteredString(font, NeonFont.of(s), cx, y, color);
+    }
+
+    public int width(String s) {
+        return font.width(NeonFont.of(s));
+    }
+
+    /** Taglia il testo perche' stia in maxW pixel. */
+    public String trim(String s, int maxW) {
+        if (width(s) <= maxW) return s;
+        int end = s.length();
+        while (end > 0 && width(s.substring(0, end)) > maxW) end--;
+        return s.substring(0, end);
+    }
+
     public boolean hover(int x, int y, int w, int h) {
         return in(mx, my, x, y, w, h);
     }
@@ -100,9 +122,9 @@ public final class Ui {
             g.fill(x, y, x + 2, y + 12, argb(acc, 0xFF));
             g.fill(x, y + 11, x + w, y + 12, argb(acc, 0x90));
         }
-        g.drawString(font, title, x + 6, y + 2, WHITE);
+        text(g, title, x + 6, y + 2, WHITE);
         if (right != null && !right.isEmpty()) {
-            g.drawString(font, right, x + w - 4 - font.width(right), y + 2,
+            text(g, right, x + w - 4 - width(right), y + 2,
                     NeonConfig.style() == NeonConfig.Style.GRADIENT ? WHITE : TEXT_FAINT);
         }
     }
@@ -112,7 +134,7 @@ public final class Ui {
         int bg = active ? argb(accent(), 0xD0) : (hov ? WIDGET_HOVER : WIDGET_BG);
         g.fill(x, y, x + w, y + h, bg);
         if (!active && hov) g.fill(x, y + h - 1, x + w, y + h, argb(accent(), 0xA0));
-        g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, WHITE);
+        centered(g, label, x + w / 2, y + (h - 8) / 2, WHITE);
         return hov && lp;
     }
 
@@ -131,7 +153,7 @@ public final class Ui {
         g.fill(x, y, x + w, y + h, WIDGET_BG);
         g.fill(x, y, x + (int) (w * t), y + h, argb(accent(), 0xB0));
         String txt = step >= 1 ? String.valueOf((int) Math.round(value)) : String.format("%.1f", value);
-        g.drawCenteredString(font, label + ": " + txt, x + w / 2, y + 2, WHITE);
+        centered(g, label + ": " + txt, x + w / 2, y + 2, WHITE);
         return value;
     }
 
@@ -139,7 +161,7 @@ public final class Ui {
     public static final int COLOR_EDITOR_H = 10 + 16 + 3 * 15;
 
     public int colorEditor(GuiGraphics g, String id, int x, int y, int w, String label, int rgb) {
-        g.drawString(font, label, x, y + 1, TEXT_DIM);
+        text(g, label, x, y + 1, TEXT_DIM);
         g.fill(x + w - 22, y, x + w, y + 9, 0xFF000000);
         g.fill(x + w - 21, y + 1, x + w - 1, y + 8, argb(rgb, 0xFF));
 

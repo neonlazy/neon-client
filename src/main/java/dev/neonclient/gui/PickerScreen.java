@@ -161,17 +161,17 @@ public class PickerScreen extends Screen {
                 g.fill(lx, ry, lx + lw, ry + ROW, 0x18FFFFFF);
             }
             g.renderItem(iconOf(e), lx + 4, ry + 1);
-            String name = this.font.plainSubstrByWidth(nameOf(e), lw / 2 - 10);
-            g.drawString(this.font, name, lx + 24, ry + 5, sel ? Ui.WHITE : Ui.TEXT_DIM);
-            String id = this.font.plainSubstrByWidth(e.shortName(), lw / 2 - 20);
-            g.drawString(this.font, id, lx + lw - 6 - this.font.width(id) - 12, ry + 5, Ui.TEXT_FAINT);
-            g.drawString(this.font, sel ? "✔" : "+", lx + lw - 12, ry + 5,
+            String name = ui.trim(nameOf(e), lw / 2 - 10);
+            ui.text(g, name, lx + 24, ry + 5, sel ? Ui.WHITE : Ui.TEXT_DIM);
+            String id = ui.trim(e.shortName(), lw / 2 - 20);
+            ui.text(g, id, lx + lw - 6 - ui.width(id) - 12, ry + 5, Ui.TEXT_FAINT);
+            ui.text(g, sel ? "✔" : "+", lx + lw - 12, ry + 5,
                     sel ? Ui.argb(Ui.accent(), 0xFF) : Ui.TEXT_FAINT);
             if (hov && ui.lp) module.toggleEntry(e.id());
         }
         g.disableScissor();
         if (list.isEmpty()) {
-            g.drawCenteredString(this.font, "No " + module.noun() + " found", lx + lw / 2, listY + 10, Ui.TEXT_FAINT);
+            ui.centered(g, "No " + module.noun() + " found", lx + lw / 2, listY + 10, Ui.TEXT_FAINT);
         }
 
         // barra di scorrimento
@@ -192,7 +192,7 @@ public class PickerScreen extends Screen {
         // footer
         String info = list.size() + " / " + module.catalog().size() + " " + module.noun();
         if (module.emptyMeansAll() && module.selected.isEmpty()) info += "  -  none selected = all";
-        g.drawString(this.font, info, px + 6, py + ph - 15, Ui.TEXT_FAINT);
+        ui.text(g, info, px + 6, py + ph - 15, Ui.TEXT_FAINT);
         boolean done = ui.button(g, px + pw - 66, py + ph - 18, 60, 14, "Done", false);
 
         // la casella di ricerca resta sempre attiva: basta scrivere

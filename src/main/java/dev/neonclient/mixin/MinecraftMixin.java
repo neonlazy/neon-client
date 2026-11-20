@@ -15,7 +15,7 @@ public abstract class MinecraftMixin {
     /** ESP: le entita' scelte brillano (glowing solo lato client, visibile attraverso i muri). */
     @Inject(method = "shouldEntityAppearGlowing", at = @At("HEAD"), cancellable = true)
     private void neon$espGlow(Entity entity, CallbackInfoReturnable<Boolean> cir) {
-        if (EspGlow.colorFor(entity) >= 0) cir.setReturnValue(true);
+        if (EspGlow.shouldGlow(entity)) cir.setReturnValue(true);
     }
 
     /** Durante la freecam si possono rompere blocchi (entro la portata del corpo) ma non usare oggetti. */

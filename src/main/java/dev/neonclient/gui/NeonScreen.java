@@ -4,6 +4,7 @@ import dev.neonclient.NeonClient;
 import dev.neonclient.NeonConfig;
 import dev.neonclient.NeonConfig.Style;
 import dev.neonclient.module.BoolSetting;
+import dev.neonclient.module.Catalog;
 import dev.neonclient.module.Category;
 import dev.neonclient.module.Module;
 import dev.neonclient.module.ModuleManager;
@@ -13,19 +14,22 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.Random;
 
 public class NeonScreen extends Screen {
-    private static final String[] TABS = {"Config", "Customize", "Macros", "Modules", "Profiles"};
-    private static final int TAB_CUSTOMIZE = 1;
-    private static final int TAB_MODULES = 3;
-    /** Colonne in ordine alfabetico; null = colonna Search (subito prima di Favorites). */
+    private static final String[] TABS = {"Modules", "Config", "Customize"};
+    private static final int TAB_MODULES = 0;
+    private static final int TAB_CUSTOMIZE = 2;
+    /** Colonne in ordine alfabetico, poi Favorites e Search (null). */
     private static final Category[] COLUMNS = {
             Category.COMBAT, Category.MISC, Category.MOVEMENT, Category.PLAYER,
-            Category.RENDER, Category.WORLD, null, Category.FAVORITES};
+            Category.RENDER, Category.WORLD, Category.FAVORITES, null};
+    private static final int LIST_ROW = 14;
+    private static final int LIST_MAX_ROWS = 8;
 
     private static final int COL_W = 80;
     private static final int GAP = 5;
@@ -40,6 +44,13 @@ public class NeonScreen extends Screen {
     private EditBox searchBox;
     private String searchQuery = "";
     private int sbX, sbY, sbW;
+
+    /** Elemento di cui si sta cambiando il colore ("" = colore di default del modulo). */
+    private String colorTarget;
+    private double listScroll;
+    private int listX, listY, listW, listH;
+    private final java.util.Map<String, String> names = new java.util.HashMap<>();
+    private final java.util.Map<String, ItemStack> icons = new java.util.HashMap<>();
     private Module settingsModule;
     private boolean listening;
     private final boolean[] prevKeys = new boolean[GLFW.GLFW_KEY_LAST + 1];
@@ -91,6 +102,12 @@ public class NeonScreen extends Screen {
         super.removed();
     }
 
+    /** Rotellina: scorre la lista degli elementi scelti nel popup (nessun @Override di proposito). */
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        listScroll -= scrollY * LIST_ROW;
+        return true;
+    }
+
     /** Niente sfocatura vanilla: lo sfondo lo disegna la GUI stessa. */
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
     }
@@ -128,6 +145,7 @@ public class NeonScreen extends Screen {
         int w = (int) Math.ceil(this.width / SCALE), h = (int) Math.ceil(this.height / SCALE);
         g.pose().pushMatrix();
         g.pose().scale(SCALE, SCALE);
+        if (settingsModule == null) colorTarget = null;
         boolean popup = settingsModule != null;
         boolean lp = ui.lp, rp = ui.rp;
         if (popup) ui.consume(); // lo sfondo non riceve click mentre il popup e' aperto
@@ -144,15 +162,23 @@ public class NeonScreen extends Screen {
 
         if (tab == TAB_MODULES) drawModules(g, w, h);
         else if (tab == TAB_CUSTOMIZE) drawCustomize(g, w);
-        else g.drawCenteredString(this.font, "Empty for now", w / 2, 50, Ui.TEXT_FAINT);
+        else ui.centered(g, "Empty for now", w / 2, 50, Ui.TEXT_FAINT);
         drawWatermark(g, w, h);
         super.render(g, ui.mx, ui.my, partialTick);
 
         if (popup) {
             ui.lp = lp;
             ui.rp = rp;
+            boolean editing = colorTarget != null;
+            if (editing) ui.consume(); // il popup sotto non riceve click mentre si modifica un colore
             g.nextStratum();
             drawPopup(g, w, h);
+            if (editing && settingsModule != null) {
+                ui.lp = lp;
+                ui.rp = rp;
+                g.nextStratum();
+                drawColorPopup(g, w, h);
+            }
         }
         g.pose().popMatrix();
     }
@@ -228,15 +254,15 @@ public class NeonScreen extends Screen {
 
     private void drawTabs(GuiGraphics g, int w) {
         int total = 0;
-        for (String t : TABS) total += this.font.width(t) + 14;
+        for (String t : TABS) total += ui.width(t) + 14;
         int x = (w - total) / 2;
         g.fill(x, 2, x + total, 17, 0xE0161722);
         for (int i = 0; i < TABS.length; i++) {
-            int tw = this.font.width(TABS[i]) + 14;
+            int tw = ui.width(TABS[i]) + 14;
             boolean hover = ui.hover(x, 2, tw, 15);
             if (i == tab) g.fill(x, 2, x + tw, 17, Ui.argb(NeonConfig.color1(), 0xFF));
             else if (hover) g.fill(x, 2, x + tw, 17, 0x33FFFFFF);
-            g.drawCenteredString(this.font, TABS[i], x + tw / 2, 6, Ui.WHITE);
+            ui.centered(g, TABS[i], x + tw / 2, 6, Ui.WHITE);
             if (hover && ui.lp) tab = i;
             x += tw;
         }
@@ -258,7 +284,7 @@ public class NeonScreen extends Screen {
             }
             y += tallest + 8;
         }
-        g.drawString(this.font, "LMB toggle  |  RMB settings", 5, h - 12, Ui.TEXT_FAINT);
+        ui.text(g, "LMB toggle  |  RMB settings", 5, h - 12, Ui.TEXT_FAINT);
     }
 
     private int drawCategory(GuiGraphics g, Category c, int x, int y) {
@@ -291,8 +317,8 @@ public class NeonScreen extends Screen {
             } else if (hov) {
                 g.fill(x, ry, x + COL_W, ry + ROW, 0x18FFFFFF);
             }
-            String name = this.font.plainSubstrByWidth(m.name, COL_W - 14);
-            g.drawString(this.font, name, x + 6, ry + 2, m.enabled ? Ui.WHITE : Ui.TEXT_DIM);
+            String name = ui.trim(m.name, COL_W - 14);
+            ui.text(g, name, x + 6, ry + 2, m.enabled ? Ui.WHITE : Ui.TEXT_DIM);
             if (m.key > 0) g.fill(x + COL_W - 5, ry + 4, x + COL_W - 3, ry + 6, Ui.argb(Ui.accent(), 0xFF));
             if (hov && ui.lp) m.toggle();
             if (hov && ui.rp) {
@@ -306,13 +332,13 @@ public class NeonScreen extends Screen {
 
     private void drawWatermark(GuiGraphics g, int w, int h) {
         String a = "NEON", b = " CLIENT", v = " v" + NeonClient.version();
-        int tw = this.font.width(a + b + v);
+        int tw = ui.width(a + b + v);
         int x = w - tw - 5, y = h - 12;
-        g.drawString(this.font, a, x, y, Ui.argb(Ui.accent(), 0xFF));
-        x += this.font.width(a);
-        g.drawString(this.font, b, x, y, Ui.WHITE);
-        x += this.font.width(b);
-        g.drawString(this.font, v, x, y, Ui.TEXT_FAINT);
+        ui.text(g, a, x, y, Ui.argb(Ui.accent(), 0xFF));
+        x += ui.width(a);
+        ui.text(g, b, x, y, Ui.WHITE);
+        x += ui.width(b);
+        ui.text(g, v, x, y, Ui.TEXT_FAINT);
     }
 
     // ------------------------------------------------------------------ module settings popup
@@ -321,9 +347,16 @@ public class NeonScreen extends Screen {
         int h = 12 + 6;
         h += m.settings.size() * 16;
         h += m.bools.size() * 18;
-        if (m.hasColor) h += Ui.COLOR_EDITOR_H + 4;
-        if (m instanceof SelectionModule) h += 18;
-        h += 18 + 14 + 6;
+        if (m instanceof SelectionModule sm) {
+            h += 18; // pulsante selettore
+            h += 18 + 14 + 6; // keybind + preferiti
+            h += 16; // colore di default
+            int n = sm.selected.size();
+            h += 12 + (n == 0 ? 12 : Math.min(LIST_MAX_ROWS, n) * LIST_ROW) + 2;
+        } else {
+            if (m.hasColor) h += Ui.COLOR_EDITOR_H + 4;
+            h += 18 + 14 + 6;
+        }
         return h;
     }
 
@@ -352,7 +385,7 @@ public class NeonScreen extends Screen {
             cy += 18;
         }
 
-        if (m.hasColor) {
+        if (m.hasColor && !(m instanceof SelectionModule)) {
             m.color = ui.colorEditor(g, "mod", cx, cy, cw, "Color", m.color);
             cy += Ui.COLOR_EDITOR_H + 4;
         }
@@ -377,10 +410,128 @@ public class NeonScreen extends Screen {
             m.favorite = !m.favorite;
             NeonConfig.save();
         }
+        cy += 18;
+
+        if (m instanceof SelectionModule sm) drawSelectedList(g, sm, cx, cy, cw);
 
         if (closeHit || (ui.lp && !Ui.in(ui.mx, ui.my, x0, y0, pw, ph))) {
             settingsModule = null;
+            colorTarget = null;
             listening = false;
+            NeonConfig.save();
+        }
+    }
+
+    /** Colore di default + lista degli elementi scelti; tasto destro su una riga = cambia il suo colore. */
+    private void drawSelectedList(GuiGraphics g, SelectionModule sm, int cx, int cy, int cw) {
+        // colore di default (per gli elementi senza colore proprio e, se non c'e' selezione, per tutti)
+        boolean hovDef = ui.hover(cx, cy, cw, 12);
+        g.fill(cx, cy, cx + cw, cy + 12, hovDef ? Ui.WIDGET_HOVER : Ui.WIDGET_BG);
+        ui.text(g, "Default color", cx + 4, cy + 2, Ui.WHITE);
+        swatch(g, cx + cw - 18, cy + 2, sm.color);
+        if (hovDef && (ui.rp || ui.lp)) colorTarget = "";
+        cy += 16;
+
+        List<String> ids = sm.selectedSorted();
+        ui.text(g, "Selected " + sm.noun() + " (" + ids.size() + ")  -  RMB: color", cx, cy, Ui.TEXT_DIM);
+        cy += 12;
+        if (ids.isEmpty()) {
+            ui.text(g, sm.emptyMeansAll() ? "None: all " + sm.noun() + " use the default color" : "None selected",
+                    cx + 2, cy + 2, Ui.TEXT_FAINT);
+            return;
+        }
+
+        int rows = Math.min(LIST_MAX_ROWS, ids.size());
+        listX = cx;
+        listY = cy;
+        listW = cw;
+        listH = rows * LIST_ROW;
+        double maxScroll = Math.max(0, ids.size() * LIST_ROW - listH);
+        listScroll = Math.max(0, Math.min(maxScroll, listScroll));
+
+        g.fill(cx, cy, cx + cw, cy + listH, 0x50000000);
+        g.enableScissor(cx, cy, cx + cw, cy + listH);
+        boolean inList = ui.hover(cx, cy, cw, listH);
+        for (int i = 0; i < ids.size(); i++) {
+            int ry = cy + i * LIST_ROW - (int) listScroll;
+            if (ry + LIST_ROW < cy || ry > cy + listH) continue;
+            String id = ids.get(i);
+            boolean hov = inList && ui.hover(cx, ry, cw, LIST_ROW);
+            if (hov) g.fill(cx, ry, cx + cw, ry + LIST_ROW, 0x18FFFFFF);
+            Catalog.Entry e = sm.entry(id);
+            ItemStack icon = e == null ? ItemStack.EMPTY : icons.computeIfAbsent(id, k -> safeIcon(e));
+            g.pose().pushMatrix();
+            g.pose().translate(cx + 2, ry + 1);
+            g.pose().scale(0.75f, 0.75f);
+            g.renderItem(icon, 0, 0);
+            g.pose().popMatrix();
+            String name = e == null ? id : names.computeIfAbsent(id, k -> safeName(e));
+            ui.text(g, ui.trim(name, cw - 40), cx + 17, ry + 3, Ui.TEXT_DIM);
+            swatch(g, cx + cw - 18, ry + 3, sm.colorOf(id));
+            if (hov && ui.rp) colorTarget = id;
+        }
+        g.disableScissor();
+        if (maxScroll > 0) {
+            int thumbH = Math.max(8, (int) (listH * (listH / (double) (ids.size() * LIST_ROW))));
+            int thumbY = cy + (int) ((listH - thumbH) * (listScroll / maxScroll));
+            g.fill(cx + cw - 2, thumbY, cx + cw, thumbY + thumbH, Ui.argb(Ui.accent(), 0xFF));
+        }
+    }
+
+    private static void swatch(GuiGraphics g, int x, int y, int rgb) {
+        g.fill(x - 1, y - 1, x + 15, y + 9, 0xFF000000);
+        g.fill(x, y, x + 14, y + 8, Ui.argb(rgb, 0xFF));
+    }
+
+    private static String safeName(Catalog.Entry e) {
+        try {
+            return e.name().get();
+        } catch (Exception ex) {
+            return e.shortName();
+        }
+    }
+
+    private static ItemStack safeIcon(Catalog.Entry e) {
+        try {
+            return e.icon().get();
+        } catch (Exception ex) {
+            return ItemStack.EMPTY;
+        }
+    }
+
+    /** Finestrella per cambiare il colore di un elemento (o quello di default). */
+    private void drawColorPopup(GuiGraphics g, int w, int h) {
+        if (!(settingsModule instanceof SelectionModule sm)) {
+            colorTarget = null;
+            return;
+        }
+        boolean def = colorTarget.isEmpty();
+        Catalog.Entry e = def ? null : sm.entry(colorTarget);
+        String title = def ? "Default color" : (e == null ? colorTarget : names.computeIfAbsent(colorTarget, k -> safeName(e)));
+        int pw = 150, ph = 12 + 6 + Ui.COLOR_EDITOR_H + 6 + 14 + 6;
+        int x0 = anchorX(w, pw) + 30, y0 = Math.max(20, (h - ph) / 2);
+        ui.panel(g, x0, y0, pw, ph, ui.trim(title, pw - 20), "");
+
+        int cx = x0 + 6, cw = pw - 12, cy = y0 + 18;
+        int cur = def ? sm.color : sm.colorOf(colorTarget);
+        int next = ui.colorEditor(g, "entry", cx, cy, cw, "Color", cur);
+        if (next != cur) {
+            if (def) {
+                sm.color = next;
+            } else {
+                sm.setEntryColor(colorTarget, next);
+            }
+        }
+        cy += Ui.COLOR_EDITOR_H + 6;
+
+        int bw = (cw - 4) / 2;
+        boolean canReset = !def && sm.hasCustomColor(colorTarget);
+        if (ui.button(g, cx, cy, bw, 14, canReset ? "Reset" : "-", false) && canReset) {
+            sm.resetEntryColor(colorTarget);
+        }
+        boolean done = ui.button(g, cx + bw + 4, cy, bw, 14, "Done", false);
+        if (done || (ui.lp && !Ui.in(ui.mx, ui.my, x0, y0, pw, ph))) {
+            colorTarget = null;
             NeonConfig.save();
         }
     }
@@ -393,10 +544,21 @@ public class NeonScreen extends Screen {
 
         // --- sfondo della GUI
         boolean grad = NeonConfig.style() == Style.GRADIENT;
-        int ph = 12 + 6 + 10 + 18 + Ui.COLOR_EDITOR_H + 6 + (grad ? Ui.COLOR_EDITOR_H + 6 : 0);
+        int ph = 12 + 6 + 28 + 10 + 18 + Ui.COLOR_EDITOR_H + 6 + (grad ? Ui.COLOR_EDITOR_H + 6 : 0);
         ui.panel(g, x0, y0, pw, ph, "Background", "");
         int cx = x0 + 6, cw = pw - 12, cy = y0 + 18;
-        g.drawString(this.font, "Style", cx, cy + 1, Ui.TEXT_DIM);
+
+        ui.text(g, "Font", cx, cy + 1, Ui.TEXT_DIM);
+        cy += 10;
+        NeonConfig.FontChoice[] fonts = NeonConfig.FontChoice.values();
+        int fw = (cw - (fonts.length - 1) * 3) / fonts.length;
+        for (int i = 0; i < fonts.length; i++) {
+            if (ui.button(g, cx + i * (fw + 3), cy, fw, 14, fonts[i].label, NeonConfig.font() == fonts[i])) {
+                NeonConfig.setFont(fonts[i]);
+            }
+        }
+        cy += 18;
+        ui.text(g, "Style", cx, cy + 1, Ui.TEXT_DIM);
         cy += 10;
         Style[] styles = Style.values();
         int bw = (cw - (styles.length - 1) * 3) / styles.length;
@@ -417,7 +579,7 @@ public class NeonScreen extends Screen {
         ui.panel(g, x1, y0, pw, ph2, "Modules", "");
         cx = x1 + 6;
         cy = y0 + 18;
-        g.drawString(this.font, "Panel style", cx, cy + 1, Ui.TEXT_DIM);
+        ui.text(g, "Panel style", cx, cy + 1, Ui.TEXT_DIM);
         cy += 10;
         NeonConfig.PanelStyle[] ps = NeonConfig.PanelStyle.values();
         bw = (cw - (ps.length - 1) * 3) / ps.length;

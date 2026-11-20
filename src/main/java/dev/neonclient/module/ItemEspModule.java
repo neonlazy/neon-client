@@ -4,14 +4,15 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 /** Oggetti droppati (tutti o quelli scelti) con effetto glowing permanente + linee tracker opzionali. */
 public class ItemEspModule extends SelectionModule {
     public final BoolSetting tracers = new BoolSetting("Tracers", false);
-    private Set<Item> itemSet = new HashSet<>();
+    private Map<Item, Integer> itemColors = new HashMap<>();
+    private int cachedDefault = -1;
 
     public ItemEspModule() {
         super("Item ESP", Category.RENDER);
@@ -35,17 +36,21 @@ public class ItemEspModule extends SelectionModule {
         return true;
     }
 
-    public boolean matches(Entity e) {
-        if (!(e instanceof ItemEntity item)) return false;
-        if (dirty) {
-            Set<Item> s = new HashSet<>();
+    /** Colore dell'oggetto droppato, oppure -1 se non va evidenziato. */
+    public int colorFor(Entity e) {
+        if (!(e instanceof ItemEntity item)) return -1;
+        if (dirty || cachedDefault != color) {
+            Map<Item, Integer> m = new HashMap<>();
             for (String id : selected) {
                 Item it = Catalog.item(id);
-                if (it != null) s.add(it);
+                if (it != null) m.put(it, colorOf(id));
             }
-            itemSet = s;
+            itemColors = m;
+            cachedDefault = color;
             dirty = false;
         }
-        return itemSet.isEmpty() || itemSet.contains(item.getItem().getItem());
+        if (itemColors.isEmpty()) return color;
+        Integer c = itemColors.get(item.getItem().getItem());
+        return c != null ? c : -1;
     }
 }

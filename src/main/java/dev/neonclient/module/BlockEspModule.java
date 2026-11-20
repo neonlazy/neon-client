@@ -40,6 +40,8 @@ public class BlockEspModule extends SelectionModule {
     }
 
     private Set<Block> targets = new HashSet<>();
+    private Map<Block, Integer> blockColors = new HashMap<>();
+    private int cachedDefault = -1;
     private final Map<Long, ChunkData> cache = new HashMap<>();
     private BlockPos[] snapshot = new BlockPos[0];
     private int tickCount;
@@ -90,19 +92,27 @@ public class BlockEspModule extends SelectionModule {
         }
         tickCount++;
 
-        if (dirty) {
+        if (dirty || cachedDefault != color) {
             Set<Block> t = new HashSet<>();
+            Map<Block, Integer> cols = new HashMap<>();
             for (String id : selected) {
                 Block b = Catalog.block(id);
-                if (b != null) t.add(b);
+                if (b != null) {
+                    t.add(b);
+                    cols.put(b, colorOf(id));
+                }
             }
-            targets = t;
-            cache.clear();
-            snapshot = new BlockPos[0];
+            blockColors = cols;
+            cachedDefault = color;
+            if (!t.equals(targets)) {
+                targets = t;
+                cache.clear();
+                snapshot = new BlockPos[0];
+            }
             dirty = false;
         }
         if (targets.isEmpty()) {
-            BlockGlow.sync(level, snapshot, color);
+            BlockGlow.sync(level, snapshot, this);
             return;
         }
 
@@ -144,7 +154,13 @@ public class BlockEspModule extends SelectionModule {
         }
 
         if (tickCount % 10 == 0) rebuildSnapshot(level, cx, cy, cz);
-        BlockGlow.sync(level, snapshot, color);
+        BlockGlow.sync(level, snapshot, this);
+    }
+
+    /** Colore con cui evidenziare un blocco (personalizzato o di default). */
+    public int colorFor(Block b) {
+        Integer c = blockColors.get(b);
+        return c != null ? c : color;
     }
 
     private static long key(int cx, int cz) {

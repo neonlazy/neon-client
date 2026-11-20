@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -136,9 +137,10 @@ public final class EspRenderer {
      * senza modello (barrier, acqua, lava, light...) e le linee tracker.
      */
     private static void drawBlocks(GuiGraphics g, Minecraft mc, BlockEspModule be) {
-        int rgb = be.color;
         for (BlockPos p : be.snapshot()) {
-            if (!BlockGlow.canGlow(mc.level.getBlockState(p))
+            BlockState st = mc.level.getBlockState(p);
+            int rgb = be.colorFor(st.getBlock());
+            if (!BlockGlow.canGlow(st)
                     && projectBox(p.getX(), p.getY(), p.getZ(), p.getX() + 1.0, p.getY() + 1.0, p.getZ() + 1.0)) {
                 outline(g, rgb, 0x20);
             }
@@ -157,12 +159,11 @@ public final class EspRenderer {
             if (e instanceof Player) {
                 if (!(pe.enabled && pe.tracers.value)) continue;
                 rgb = pe.color;
-            } else if (ee.enabled && ee.tracers.value && ee.matches(e)) {
-                rgb = ee.color;
-            } else if (ie.enabled && ie.tracers.value && ie.matches(e)) {
-                rgb = ie.color;
             } else {
-                continue;
+                int c = ee.enabled && ee.tracers.value ? ee.colorFor(e) : -1;
+                if (c < 0 && ie.enabled && ie.tracers.value) c = ie.colorFor(e);
+                if (c < 0) continue;
+                rgb = c;
             }
             double x = Mth.lerp(pt, e.xo, e.getX());
             double y = Mth.lerp(pt, e.yo, e.getY()) + e.getBbHeight() / 2.0;

@@ -45,4 +45,8 @@ public abstract class Module {
     /** Lista extra da salvare in config (usata da Block ESP). */
     public List<String> getList() { return null; }
     public void setList(List<String> list) {}
+
+    /** Colori per singolo elemento (usata dagli ESP con selettore). */
+    public java.util.Map<String, Integer> getColorMap() { return null; }
+    public void setColorMap(java.util.Map<String, Integer> map) {}
 }

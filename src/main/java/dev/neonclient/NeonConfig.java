@@ -30,11 +30,19 @@ public class NeonConfig {
         PanelStyle(String label) { this.label = label; }
     }
 
+    /** Carattere della GUI. */
+    public enum FontChoice {
+        MINECRAFT("Minecraft"), DEFAULT("Default"), VANILLA_PLUS("Vanilla+");
+        public final String label;
+        FontChoice(String label) { this.label = label; }
+    }
+
     static class ModData {
         int key;
         boolean favorite;
         int color = -1;
         java.util.List<String> blocks;
+        Map<String, Integer> colors;
         Map<String, Double> settings = new HashMap<>();
     }
 
@@ -43,6 +51,7 @@ public class NeonConfig {
         int color1 = 0xA020F0;
         int color2 = 0x2B0A4F;
         String panelStyle = PanelStyle.SOLID.name();
+        String font = FontChoice.MINECRAFT.name();
         int panelColor1 = 0x0B0912;
         int panelColor2 = 0x2A0F45;
         Map<String, ModData> modules = new HashMap<>();
@@ -69,6 +78,7 @@ public class NeonConfig {
             md.favorite = m.favorite;
             md.color = m.hasColor ? m.color : -1;
             md.blocks = m.getList();
+            md.colors = m.getColorMap();
             for (NumberSetting s : m.settings) md.settings.put(s.name, s.value);
             for (BoolSetting b : m.bools) md.settings.put("bool:" + b.name, b.value ? 1.0 : 0.0);
         }
@@ -86,6 +96,7 @@ public class NeonConfig {
         m.favorite = md.favorite;
         if (m.hasColor && md.color >= 0) m.color = md.color & 0xFFFFFF;
         if (md.blocks != null) m.setList(md.blocks);
+        if (md.colors != null) m.setColorMap(md.colors);
         for (NumberSetting s : m.settings) {
             Double v = md.settings.get(s.name);
             if (v != null) s.set(v);
@@ -123,4 +134,14 @@ public class NeonConfig {
     public static int panelColor2() { return data.panelColor2 & 0xFFFFFF; }
     public static void setPanelColor1(int rgb) { data.panelColor1 = rgb & 0xFFFFFF; }
     public static void setPanelColor2(int rgb) { data.panelColor2 = rgb & 0xFFFFFF; }
+
+    public static FontChoice font() {
+        try {
+            return FontChoice.valueOf(data.font);
+        } catch (Exception e) {
+            return FontChoice.MINECRAFT;
+        }
+    }
+
+    public static void setFont(FontChoice f) { data.font = f.name(); }
 }
